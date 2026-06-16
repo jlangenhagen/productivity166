@@ -1,0 +1,2283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PhD Escape Room – Productivity Hacks</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --text-dim: #8b949e;
+    --accent1: #238636; /* Level 1 green */
+    --accent2: #1f6feb; /* Level 2 blue */
+    --accent3: #9e6a03; /* Level 3 amber */
+    --accent4: #8957e5; /* Level 4 purple */
+    --success: #2ea043;
+    --error: #da3633;
+    --warning: #d29922;
+    --card: #21262d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── HUD ── */
+  #hud {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: #0d1117ee;
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(6px);
+    display: flex; flex-direction: column;
+  }
+  .hud-top {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 16px; min-height: 44px;
+  }
+  .hud-bottom {
+    display: flex; align-items: center; gap: 8px;
+    padding: 3px 16px 5px;
+    border-top: 1px solid #ffffff0a;
+  }
+  #hud .hud-title {
+    font-weight: 700; font-size: 13px; color: var(--text-dim);
+    letter-spacing: .05em; text-transform: uppercase;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  #progress-bar { display: flex; gap: 4px; width: 88px; flex-shrink: 0; }
+  .prog-seg {
+    height: 6px; flex: 1; border-radius: 4px;
+    background: var(--border); transition: background .4s;
+  }
+  .prog-seg.done-1 { background: var(--accent1); }
+  .prog-seg.done-2 { background: var(--accent2); }
+  .prog-seg.done-3 { background: var(--accent3); }
+  .prog-seg.done-4 { background: var(--accent4); }
+  #hud-score { font-size: 13px; color: var(--text-dim); margin-left: auto; white-space: nowrap; flex-shrink: 0; }
+  #hud-score span { color: var(--text); font-weight: 700; }
+  #timer { font-size: 13px; color: var(--warning); font-variant-numeric: tabular-nums; white-space: nowrap; margin-left: auto; flex-shrink: 0; }
+  .level-chips { display: flex; gap: 3px; flex-wrap: wrap; }
+  .level-chip {
+    font-size: 11px; padding: 2px 7px; border-radius: 4px;
+    border: 1px solid var(--border); color: var(--text-dim);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .level-chip.c1 { border-color: var(--accent1); color: var(--accent1); }
+  .level-chip.c2 { border-color: var(--accent2); color: var(--accent2); }
+  .level-chip.c3 { border-color: var(--accent3); color: var(--accent3); }
+  .level-chip.c4 { border-color: var(--accent4); color: #c9a9ff; }
+  #timeover-banner {
+    display: none; position: fixed; inset: 0; z-index: 200;
+    background: #0d1117ee; align-items: center; justify-content: center;
+    flex-direction: column; text-align: center; gap: 16px;
+  }
+  #timeover-banner.show { display: flex; }
+  #timeover-banner h2 { font-size: 28px; color: #ff7b72; }
+  #timeover-banner p { color: var(--text-dim); }
+  /* ── Room nav ── */
+  #room-nav { display: flex; gap: 4px; flex-shrink: 0; flex-wrap: wrap; }
+  .nav-btn {
+    padding: 4px 10px; border-radius: 5px; border: 1px solid transparent;
+    background: none; color: var(--text-dim); font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all .15s; white-space: nowrap;
+  }
+  .nav-btn:hover { background: var(--card); color: var(--text); border-color: var(--border); }
+  .nav-btn.nav-active { background: var(--card); color: var(--text); border-color: #58a6ff; }
+  .nav-label { display: inline; }
+
+  /* ── Screens ── */
+  .screen { display: none; min-height: 100vh; padding: 84px 20px 40px; }
+  .screen.active { display: block; }
+  .screen-inner { max-width: 860px; margin: 0 auto; }
+
+  /* ── Intro ── */
+  #screen-intro.active { display: flex; align-items: center; justify-content: center; }
+  .terminal-box {
+    background: #010409;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 32px 36px;
+    max-width: 640px;
+    width: 100%;
+  }
+  .terminal-box .term-bar {
+    display: flex; gap: 6px; margin-bottom: 20px;
+  }
+  .term-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .term-dot.red { background: #ff5f56; }
+  .term-dot.yellow { background: #ffbd2e; }
+  .term-dot.green { background: #27c93f; }
+  .term-line { font-family: 'Courier New', monospace; font-size: 14px; margin: 4px 0; min-height: 1.4em; }
+  .term-line .prompt { color: #27c93f; }
+  .term-line .cmd { color: #79c0ff; }
+  .term-line .err { color: #ff7b72; }
+  .term-line .ok { color: #3fb950; }
+  .term-line .dim { color: #6e7681; }
+  .term-cursor {
+    display: inline-block; width: 9px; height: 15px;
+    background: #27c93f; vertical-align: text-bottom; margin-left: 1px;
+    animation: cur-blink 1s step-end infinite;
+  }
+  @keyframes cur-blink { 0%,100%{opacity:1} 50%{opacity:0} }
+  .intro-story { opacity: 0; transition: opacity .7s ease; }
+  .intro-story.visible { opacity: 1; }
+  h1.story-title {
+    font-size: 26px; font-weight: 800; margin: 28px 0 12px;
+    background: linear-gradient(90deg, #58a6ff, #3fb950);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .story-text { color: var(--text-dim); margin-bottom: 8px; }
+  .note-box {
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--warning);
+    background: var(--surface);
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin: 20px 0;
+    font-style: italic;
+    color: var(--text);
+  }
+  .note-box .note-from { font-size: 12px; color: var(--text-dim); margin-top: 8px; font-style: normal; }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 10px 22px; border-radius: 6px; border: none; cursor: pointer;
+    font-size: 14px; font-weight: 600; transition: all .2s; text-decoration: none;
+  }
+  .btn-primary { background: var(--success); color: #fff; }
+  .btn-primary:hover { background: #3fb950; transform: translateY(-1px); }
+  .btn-secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: var(--border); }
+  .btn-danger { background: var(--error); color: #fff; }
+  .btn-sm { padding: 6px 14px; font-size: 13px; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+  /* ── Level header ── */
+  .level-header {
+    border-radius: 10px;
+    padding: 24px 28px;
+    margin-bottom: 28px;
+    border: 1px solid var(--border);
+  }
+  .level-header.l1 { border-color: var(--accent1); background: #13261e; }
+  .level-header.l2 { border-color: var(--accent2); background: #0d1f36; }
+  .level-header.l3 { border-color: var(--accent3); background: #1e1509; }
+  .level-header.l4 { border-color: var(--accent4); background: #1a1030; }
+  .level-badge {
+    font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    border-radius: 4px; padding: 3px 10px; display: inline-block; margin-bottom: 8px;
+  }
+  .l1 .level-badge { background: var(--accent1); color: #fff; }
+  .l2 .level-badge { background: var(--accent2); color: #fff; }
+  .l3 .level-badge { background: var(--accent3); color: #0d1117; }
+  .l4 .level-badge { background: var(--accent4); color: #fff; }
+  .level-header h2 { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+  .level-header p { color: var(--text-dim); font-size: 14px; }
+
+  /* ── Puzzle card ── */
+  .puzzle-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px 26px;
+    margin-bottom: 20px;
+  }
+  .puzzle-num {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--text-dim); margin-bottom: 10px;
+  }
+  .puzzle-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 14px; }
+  .puzzle-card p { color: var(--text-dim); font-size: 14px; margin-bottom: 14px; }
+
+  /* ── Feedback ── */
+  .feedback {
+    display: none; border-radius: 6px; padding: 12px 16px;
+    margin-top: 12px; font-size: 14px; font-weight: 600;
+  }
+  .feedback.show { display: block; }
+  .feedback.correct { background: #0d2b18; border: 1px solid var(--success); color: #3fb950; }
+  .feedback.wrong { background: #2b0d0d; border: 1px solid var(--error); color: #ff7b72; }
+
+  /* ── Explain panel ── */
+  .explain-btn {
+    display: none; margin-top: 10px;
+    background: none; border: 1px solid var(--border);
+    color: var(--text-dim); border-radius: 6px;
+    padding: 7px 14px; cursor: pointer; font-size: 13px;
+    transition: all .2s;
+  }
+  .explain-btn:hover { background: var(--card); color: var(--text); }
+  .explain-btn.show { display: inline-block; }
+  .explain-panel {
+    display: none; margin-top: 10px;
+    background: #0d1b2a; border: 1px solid #1f6feb44;
+    border-left: 3px solid var(--accent2);
+    border-radius: 6px; padding: 14px 16px;
+    font-size: 13px; color: #9bc2f5; line-height: 1.7;
+  }
+  .explain-panel.show { display: block; }
+  .explain-panel strong { color: #79c0ff; }
+
+  /* ── Drag & Drop ── */
+  .drag-area { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; min-height: 48px; }
+  .drag-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 13px;
+    cursor: grab;
+    user-select: none;
+    transition: all .15s;
+  }
+  .drag-card:hover { border-color: #58a6ff; background: #21262d; }
+  .drag-card.dragging { opacity: .45; }
+  .drag-card.placed-correct { border-color: var(--success); background: #0d2b18; color: #3fb950; cursor: default; }
+  .drag-card.placed-wrong { border-color: var(--error); background: #2b0d0d; color: #ff7b72; }
+
+  .drop-zone {
+    background: #010409;
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    min-height: 80px;
+    transition: border-color .2s;
+    flex: 1; min-width: 140px;
+  }
+  .drop-zone.over { border-color: #58a6ff; background: #0d1b2a; }
+  .drop-zone h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-dim); margin-bottom: 8px; }
+
+  .kanban-board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 14px 0; }
+  @media (max-width: 700px) { .kanban-board { grid-template-columns: repeat(2, 1fr); } }
+
+  .bucket-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0; }
+  @media (max-width: 600px) { .bucket-grid { grid-template-columns: repeat(2, 1fr); } }
+
+  /* ── Click-to-assign ── */
+  .assign-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
+  @media (max-width: 540px) { .assign-grid { grid-template-columns: 1fr; } }
+  .assign-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 14px; cursor: pointer;
+    font-size: 13px; transition: all .2s;
+  }
+  .assign-card:hover { border-color: #58a6ff; }
+  .assign-card .assign-label { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-dim); margin-top: 6px; }
+  .assign-card.correct { border-color: var(--success); background: #0d2b18; }
+  .assign-card.wrong { border-color: var(--error); background: #2b0d0d; }
+  .assign-btn-row { display: flex; gap: 8px; margin-top: 6px; }
+  .assign-choice {
+    flex: 1; padding: 6px 10px; border-radius: 5px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); cursor: pointer; font-size: 12px; font-weight: 600;
+    transition: all .15s;
+  }
+  .assign-choice:hover { background: var(--border); }
+  .assign-choice.selected-correct { background: var(--success); border-color: var(--success); color: #fff; }
+  .assign-choice.selected-wrong { background: var(--error); border-color: var(--error); color: #fff; }
+
+  /* ── Multiple choice ── */
+  .mc-options { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+  .mc-option {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 7px; padding: 11px 16px; cursor: pointer;
+    font-size: 14px; display: flex; gap: 10px; align-items: center;
+    transition: all .15s;
+  }
+  .mc-option:hover { border-color: #58a6ff; background: #21262d; }
+  .mc-option .mc-letter {
+    width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; flex-shrink: 0;
+  }
+  .mc-option.correct { border-color: var(--success); background: #0d2b18; }
+  .mc-option.correct .mc-letter { border-color: var(--success); color: #3fb950; }
+  .mc-option.wrong { border-color: var(--error); background: #2b0d0d; }
+  .mc-option.wrong .mc-letter { border-color: var(--error); color: #ff7b72; }
+  .mc-option.disabled { cursor: default; }
+
+  /* ── Checkbox puzzle ── */
+  .check-list { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+  .check-item {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 7px; padding: 10px 14px; cursor: pointer;
+    font-size: 14px; transition: all .15s; user-select: none;
+  }
+  .check-item:hover { border-color: #58a6ff; }
+  .check-item input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--success); }
+  .check-item.locked { cursor: default; }
+  .check-item.correct-checked { border-color: var(--success); background: #0d2b18; }
+  .check-item.wrong-checked { border-color: var(--error); background: #2b0d0d; }
+
+  /* ── Text input ── */
+  .text-input {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 7px; padding: 10px 14px; color: var(--text);
+    font-size: 15px; width: 100%; outline: none;
+    transition: border-color .2s;
+  }
+  .text-input:focus { border-color: #58a6ff; }
+  .text-input.correct { border-color: var(--success); }
+  .text-input.wrong { border-color: var(--error); }
+
+  select.text-input { cursor: pointer; }
+
+  /* ── Order puzzle ── */
+  .order-list { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+  .order-item {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 7px; padding: 10px 14px; cursor: grab;
+    font-size: 14px; display: flex; align-items: center; gap: 10px;
+    user-select: none; transition: all .15s;
+  }
+  .order-item:hover { border-color: #58a6ff; }
+  .order-item .order-handle { color: var(--text-dim); font-size: 16px; }
+  .order-item.order-correct { border-color: var(--success); background: #0d2b18; cursor: default; }
+  .order-item.order-wrong { border-color: var(--error); background: #2b0d0d; }
+
+  /* ── Code reveal ── */
+  .code-reveal {
+    background: #010409;
+    border: 1px solid var(--success);
+    border-radius: 8px;
+    padding: 20px 24px;
+    text-align: center;
+    margin-top: 24px;
+    display: none;
+  }
+  .code-reveal.show { display: block; }
+  .code-reveal .code-label { font-size: 12px; text-transform: uppercase; letter-spacing: .1em; color: var(--text-dim); margin-bottom: 8px; }
+  .code-reveal .code-value {
+    font-family: 'Courier New', monospace; font-size: 28px; font-weight: 800;
+    color: #3fb950; letter-spacing: .2em;
+  }
+  .code-reveal p { color: var(--text-dim); font-size: 13px; margin-top: 10px; }
+
+  /* ── Final screen ── */
+  .final-inner { max-width: 580px; }
+  .final-inner h1 { font-size: 32px; font-weight: 900; margin: 20px 0 12px; }
+  .final-inner .final-sub { color: var(--text-dim); margin-bottom: 24px; }
+  .final-scores {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 20px 0;
+    text-align: left;
+  }
+  .final-score-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 16px;
+  }
+  .final-score-card .fsc-level { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-dim); }
+  .final-score-card .fsc-pts { font-size: 22px; font-weight: 800; }
+  .final-score-card .fsc-note { font-size: 12px; color: var(--text-dim); }
+
+  /* ── Code entry ── */
+  #code-entry-area {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 24px; margin-top: 24px;
+  }
+  #code-entry-area h3 { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+  .code-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  @media (max-width: 480px) { .code-slots { grid-template-columns: 1fr; } }
+  .code-slot { display: flex; flex-direction: column; gap: 4px; }
+  .code-slot label { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-dim); }
+  .confetti-wrap { position: fixed; inset: 0; pointer-events: none; z-index: 999; }
+  .confetti-piece {
+    position: absolute; width: 8px; height: 14px; opacity: 0;
+    animation: fall 3s ease-in forwards;
+  }
+  @keyframes fall {
+    0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  /* ── Utility ── */
+  .mt-8 { margin-top: 8px; }
+  .mt-16 { margin-top: 16px; }
+  .mt-24 { margin-top: 24px; }
+  .flex-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .score-pill {
+    display: inline-block; background: var(--card); border: 1px solid var(--border);
+    border-radius: 20px; padding: 2px 12px; font-size: 12px; color: var(--text-dim);
+  }
+
+  /* ── Scrum vs Kanban ── */
+  .svk-grid { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+  .svk-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 7px; padding: 10px 14px; font-size: 13px;
+    cursor: default;
+  }
+  .svk-card .svk-text { margin-bottom: 6px; }
+  .svk-choice-row { display: flex; gap: 6px; }
+  .svk-btn {
+    flex: 1; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all .15s;
+  }
+  .svk-btn:hover { background: var(--border); }
+  .svk-btn.svk-correct { background: var(--success); border-color: var(--success); color: #fff; cursor: default; }
+  .svk-btn.svk-wrong { background: var(--error); border-color: var(--error); color: #fff; }
+  .svk-btn.svk-disabled { cursor: default; opacity: .5; }
+
+  /* ── Level nav ── */
+  .level-nav { display: flex; gap: 8px; margin-top: 28px; justify-content: flex-end; }
+
+  .stand-up-match { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+  .sum-row { display: flex; align-items: center; gap: 8px; }
+  .sum-q { flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-size: 13px; }
+  .sum-arrow { color: var(--text-dim); }
+  .sum-cat-select {
+    background: var(--card); border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 10px; color: var(--text); font-size: 13px; cursor: pointer; outline: none;
+  }
+  .sum-cat-select.correct { border-color: var(--success); background: #0d2b18; }
+  .sum-cat-select.wrong { border-color: var(--error); background: #2b0d0d; }
+
+  .quest-assign { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+  .qa-row { display: flex; align-items: center; gap: 8px; }
+  .qa-activity { flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-size: 13px; }
+  .qa-select {
+    background: var(--card); border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 10px; color: var(--text); font-size: 13px; cursor: pointer; outline: none;
+  }
+  .qa-select.correct { border-color: var(--success); background: #0d2b18; }
+  .qa-select.wrong { border-color: var(--error); background: #2b0d0d; }
+
+  .habit-law-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
+  @media (max-width: 540px) { .habit-law-grid { grid-template-columns: 1fr; } }
+  .law-zone {
+    background: #010409; border: 2px dashed var(--border);
+    border-radius: 8px; padding: 12px; min-height: 100px;
+  }
+  .law-zone h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-dim); margin-bottom: 8px; }
+
+  /* ════════════════════ RESPONSIVE ════════════════════ */
+
+  /* ── Tablet: ≤ 768px ── */
+  @media (max-width: 768px) {
+    .hud-title { display: none; }
+    .screen { padding-left: 14px; padding-right: 14px; }
+    .screen-inner { max-width: 100%; }
+    .kanban-board { grid-template-columns: repeat(2, 1fr); }
+    h1.story-title { font-size: 22px; }
+  }
+
+  /* ── Mobile: ≤ 560px ── */
+  @media (max-width: 560px) {
+    /* HUD */
+    .hud-top { padding: 5px 10px; min-height: 40px; gap: 6px; }
+    .hud-bottom { padding: 3px 10px 4px; gap: 6px; }
+    .nav-label { display: none; }
+    .nav-btn { padding: 4px 8px; font-size: 15px; }
+    #timer { font-size: 12px; }
+    #hud-score { font-size: 12px; }
+    .level-chip { font-size: 10px; padding: 2px 5px; }
+
+    /* Screen */
+    .screen { padding: 78px 12px 28px; }
+
+    /* Terminal */
+    .terminal-box { padding: 18px 14px; }
+    .term-line { font-size: 12px; }
+
+    /* Intro */
+    h1.story-title { font-size: 18px; }
+    .note-box { padding: 12px 14px; font-size: 14px; }
+
+    /* Puzzle cards & level header */
+    .puzzle-card { padding: 16px 13px; }
+    .level-header { padding: 16px 16px; }
+    .level-header h2 { font-size: 18px; }
+    .level-header p { font-size: 13px; }
+    .puzzle-card h3 { font-size: 15px; }
+
+    /* Stand-up match: stack question above dropdown */
+    .sum-row { flex-direction: column; align-items: stretch; gap: 4px; }
+    .sum-arrow { display: none; }
+    .sum-cat-select { width: 100%; }
+
+    /* Daily quest assign: same treatment */
+    .qa-row { flex-direction: column; align-items: stretch; gap: 4px; }
+    .qa-select { width: 100%; }
+
+    /* Kanban */
+    .kanban-board { grid-template-columns: 1fr 1fr; }
+    .drop-zone { min-width: 0; }
+
+    /* Bucket grid */
+    .bucket-grid { grid-template-columns: repeat(2, 1fr); }
+
+    /* Code reveal */
+    .code-reveal .code-value { font-size: 20px; letter-spacing: .1em; }
+    .code-reveal { padding: 16px 14px; }
+
+    /* Code entry */
+    #code-entry-area { padding: 16px 13px; }
+    .code-slots { gap: 8px; }
+
+    /* Final scores */
+    .final-scores { grid-template-columns: 1fr; }
+
+    /* Buttons */
+    .btn { padding: 9px 16px; font-size: 13px; }
+  }
+
+  /* ── Very small: ≤ 380px ── */
+  @media (max-width: 380px) {
+    .hud-top { gap: 4px; }
+    .nav-btn { padding: 3px 6px; }
+    .screen { padding: 76px 8px 24px; }
+    .terminal-box { padding: 14px 10px; }
+    .term-line { font-size: 11px; }
+    .kanban-board { grid-template-columns: 1fr; }
+    .bucket-grid { grid-template-columns: 1fr; }
+    .svk-grid { gap: 6px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════ HUD ════════════════════════════════════ -->
+<div id="hud">
+  <div class="hud-top">
+    <span class="hud-title">PhD Escape Room</span>
+    <nav id="room-nav">
+      <button class="nav-btn nav-active" id="nav-home" onclick="navTo('home')">🏠 <span class="nav-label">Home</span></button>
+      <button class="nav-btn"            id="nav-l1"   onclick="navTo(1)">🔬 <span class="nav-label">Room 1</span></button>
+      <button class="nav-btn"            id="nav-l2"   onclick="navTo(2)">📅 <span class="nav-label">Room 2</span></button>
+      <button class="nav-btn"            id="nav-l3"   onclick="navTo(3)">📥 <span class="nav-label">Room 3</span></button>
+      <button class="nav-btn"            id="nav-l4"   onclick="navTo(4)">⚗️ <span class="nav-label">Room 4</span></button>
+    </nav>
+    <div id="timer">⏱ <span id="timer-display">90:00</span></div>
+  </div>
+  <div class="hud-bottom">
+    <div id="progress-bar">
+      <div class="prog-seg" id="ps1"></div>
+      <div class="prog-seg" id="ps2"></div>
+      <div class="prog-seg" id="ps3"></div>
+      <div class="prog-seg" id="ps4"></div>
+    </div>
+    <div class="level-chips">
+      <span class="level-chip" id="chip1">L1: 0/25</span>
+      <span class="level-chip" id="chip2">L2: 0/25</span>
+      <span class="level-chip" id="chip3">L3: 0/25</span>
+      <span class="level-chip" id="chip4">L4: 0/25</span>
+    </div>
+    <div id="hud-score">Total: <span id="score-display">0</span>/100</div>
+  </div>
+</div>
+
+<!-- Timer-expired overlay -->
+<div id="timeover-banner">
+  <div style="font-size:56px;">⏰</div>
+  <h2>Time's up!</h2>
+  <p>Prof. Dr. Zeitlos is not impressed — but you can still finish!</p>
+  <button class="btn btn-secondary" onclick="document.getElementById('timeover-banner').classList.remove('show')">Continue anyway →</button>
+</div>
+
+<!-- ════════════════════════════════ INTRO ════════════════════════════════════ -->
+<div id="screen-intro" class="screen active">
+  <div class="terminal-box">
+    <div class="term-bar">
+      <div class="term-dot red"></div>
+      <div class="term-dot yellow"></div>
+      <div class="term-dot green"></div>
+    </div>
+
+    <!-- animated terminal lines -->
+    <div class="term-line" id="tl-cmd">
+      <span class="prompt">goethe-uni@server:~$&nbsp;</span><span class="cmd" id="tl-cmd-text"></span><span class="term-cursor" id="tl-cursor"></span>
+    </div>
+    <div class="term-line" id="tl-err" style="visibility:hidden"><span class="err">ERROR: Access denied. Security system active.</span></div>
+    <div class="term-line" id="tl-dim" style="visibility:hidden"><span class="dim">4 security levels must be cleared before upload is possible.</span></div>
+    <div class="term-line" id="tl-ok"  style="visibility:hidden"><span class="ok" id="tl-ok-text">Loading briefing</span><span class="ok" id="tl-dots"></span></div>
+
+    <!-- story content, hidden until terminal finishes -->
+    <div class="intro-story" id="intro-story">
+      <h1 class="story-title">🎓 PhD Escape Room</h1>
+      <p class="story-text">You arrive at your office on the day your dissertation is due. There is a note on your desk from your supervisor.</p>
+
+      <div class="note-box">
+        "I have locked the university server with a 4-stage security system. You can only upload your dissertation once you have mastered all four rooms. Each room tests one of the productivity systems from our workshop. The tools are all in your head — you just need to use them.<br><br>Good luck. You have 90 minutes."
+        <div class="note-from">— Prof. Dr. Zeitlos, Goethe University Frankfurt</div>
+      </div>
+
+      <p class="story-text" style="margin-bottom:20px;">Four rooms. Four codes. One dissertation to submit. Are you ready?</p>
+      <button class="btn btn-primary" id="start-btn" onclick="startGame()">🚀 Start the Escape Room</button>
+
+      <!-- Code submission — always accessible from home -->
+      <div id="home-code-area" style="margin-top:32px; border-top:1px solid var(--border); padding-top:24px;">
+        <h3 style="font-size:15px; font-weight:700; margin-bottom:6px;">🔐 Submit Dissertation</h3>
+        <p style="color:var(--text-dim); font-size:13px; margin-bottom:16px;">Found all four codes? Enter them here to unlock the upload server.</p>
+        <div class="code-slots" style="margin-bottom:14px;">
+          <div class="code-slot"><label>Room 1 – Scrum Lab</label><input class="text-input" id="ci1" placeholder="Enter code…" style="text-transform:uppercase;font-family:monospace;letter-spacing:.1em;"></div>
+          <div class="code-slot"><label>Room 2 – Calendar Tower</label><input class="text-input" id="ci2" placeholder="Enter code…" style="text-transform:uppercase;font-family:monospace;letter-spacing:.1em;"></div>
+          <div class="code-slot"><label>Room 3 – GTD HQ</label><input class="text-input" id="ci3" placeholder="Enter code…" style="text-transform:uppercase;font-family:monospace;letter-spacing:.1em;"></div>
+          <div class="code-slot"><label>Room 4 – Habits Lab</label><input class="text-input" id="ci4" placeholder="Enter code…" style="text-transform:uppercase;font-family:monospace;letter-spacing:.1em;"></div>
+        </div>
+        <button class="btn btn-primary" onclick="submitCodes()">🚀 Upload Dissertation</button>
+        <div id="code-feedback" class="feedback mt-8"></div>
+      </div>
+
+      <!-- Success area -->
+      <div id="final-success" style="display:none;" class="mt-24">
+        <div class="terminal-box" style="text-align:left;">
+          <div class="term-bar"><div class="term-dot red"></div><div class="term-dot yellow"></div><div class="term-dot green"></div></div>
+          <div id="success-term-body"></div>
+        </div>
+        <div id="success-reveal" style="opacity:0; transition: opacity 1s ease; margin-top:24px; pointer-events:none;">
+          <div class="note-box">
+            "You have proven that you command the tools of a productive researcher. Agile methods, intentional time management, Getting Things Done, and Atomic Habits are now part of your toolkit. Now it's up to you to actually use them — one small habit at a time."
+            <div class="note-from">— Prof. Dr. Zeitlos, Goethe University Frankfurt</div>
+          </div>
+          <div class="final-scores" id="final-score-cards"></div>
+          <div style="font-size:24px; font-weight:900; margin:16px 0;" id="final-total-display"></div>
+          <p style="color:var(--text-dim); font-size:13px; margin-top:8px;">"Dream in years. Plan in months. Evaluate in weeks. Ship daily." — D.J. Patil</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════ LEVEL 1 ════════════════════════════════════ -->
+<div id="screen-l1" class="screen">
+  <div class="screen-inner">
+    <div class="level-header l1">
+      <span class="level-badge">Level 1 of 4</span>
+      <h2>🔬 The Scrum Lab</h2>
+      <p>Prof. Zeitlos' Kanban board is in total chaos. Restore order and prove you understand agile research methods.</p>
+    </div>
+
+    <!-- Puzzle 1: Kanban Board -->
+    <div class="puzzle-card" id="p1-card">
+      <div class="puzzle-num">Puzzle 1 / 4 · Kanban Board</div>
+      <h3>Sort the Kanban Board</h3>
+      <p>Drag each task card into the correct column. Read each card carefully — the status is described in the text.</p>
+
+      <div id="p1-source" class="drag-area"></div>
+
+      <div class="kanban-board" id="p1-board">
+        <div class="drop-zone" id="kz-todo" data-col="todo" ondragover="allowDrop(event)" ondrop="dropKanban(event)">
+          <h4>📋 To Do</h4>
+        </div>
+        <div class="drop-zone" id="kz-doing" data-col="doing" ondragover="allowDrop(event)" ondrop="dropKanban(event)">
+          <h4>⚙️ In Progress</h4>
+        </div>
+        <div class="drop-zone" id="kz-review" data-col="review" ondragover="allowDrop(event)" ondrop="dropKanban(event)">
+          <h4>🔍 Review</h4>
+        </div>
+        <div class="drop-zone" id="kz-done" data-col="done" ondragover="allowDrop(event)" ondrop="dropKanban(event)">
+          <h4>✅ Done</h4>
+        </div>
+      </div>
+
+      <div id="p1-feedback" class="feedback"></div>
+      <button class="explain-btn" id="p1-explain-btn" onclick="toggleExplain('p1')">💡 Show explanation</button>
+      <div class="explain-panel" id="p1-explain">
+        A Kanban board visualises the status of tasks across the workflow. In this puzzle, all four columns are used — including the <strong>Review column</strong>, which the workshop introduced as an optional addition between Doing and Done, so tasks are checked before they count as finished.
+      </div>
+    </div>
+
+    <!-- Puzzle 2: Daily Stand-Up -->
+    <div class="puzzle-card" id="p2-card">
+      <div class="puzzle-num">Puzzle 2 / 4 · Daily Stand-Up</div>
+      <h3>Match the Stand-Up Questions</h3>
+      <p>Assign each Stand-Up question to its correct category. Then answer the scenario question.</p>
+
+      <div class="stand-up-match" id="p2-match">
+        <div class="sum-row">
+          <div class="sum-q">"What did you do yesterday?"</div>
+          <span class="sum-arrow">→</span>
+          <select class="sum-cat-select" id="su1" onchange="checkSU()">
+            <option value="">-- select --</option>
+            <option value="past">Past / Yesterday</option>
+            <option value="present">Present / Today</option>
+            <option value="blocker">Blockers / Impediments</option>
+          </select>
+        </div>
+        <div class="sum-row">
+          <div class="sum-q">"What will you do today?"</div>
+          <span class="sum-arrow">→</span>
+          <select class="sum-cat-select" id="su2" onchange="checkSU()">
+            <option value="">-- select --</option>
+            <option value="past">Past / Yesterday</option>
+            <option value="present">Present / Today</option>
+            <option value="blocker">Blockers / Impediments</option>
+          </select>
+        </div>
+        <div class="sum-row">
+          <div class="sum-q">"Are there any impediments in your way?"</div>
+          <span class="sum-arrow">→</span>
+          <select class="sum-cat-select" id="su3" onchange="checkSU()">
+            <option value="">-- select --</option>
+            <option value="past">Past / Yesterday</option>
+            <option value="present">Present / Today</option>
+            <option value="blocker">Blockers / Impediments</option>
+          </select>
+        </div>
+      </div>
+
+      <p class="mt-16" style="font-weight:600;">Scenario: Your supervisor hasn't answered your email for two weeks and you cannot continue your research without their feedback. Which Stand-Up category does this belong to?</p>
+      <div class="mc-options" id="p2-scenario">
+        <div class="mc-option" onclick="pickSUScenario(this,'wrong')"><div class="mc-letter">A</div>Past / Yesterday</div>
+        <div class="mc-option" onclick="pickSUScenario(this,'wrong')"><div class="mc-letter">B</div>Present / Today</div>
+        <div class="mc-option" onclick="pickSUScenario(this,'correct')"><div class="mc-letter">C</div>Blockers / Impediments</div>
+        <div class="mc-option" onclick="pickSUScenario(this,'wrong')"><div class="mc-letter">D</div>None of the above</div>
+      </div>
+
+      <div id="p2-feedback" class="feedback"></div>
+      <button class="explain-btn" id="p2-explain-btn" onclick="toggleExplain('p2')">💡 Show explanation</button>
+      <div class="explain-panel" id="p2-explain">
+        As covered in the workshop: <strong>"Daily Scrum / Stand-Up: Daily 15-minute meeting for coordination."</strong> The three questions are: <em>Past / Yesterday – Present / Today – Blockers / Impediments.</em> The key follow-up question is: <strong>who helps when?</strong> An unanswered email that blocks your progress is a classic Blocker / Impediment.
+      </div>
+    </div>
+
+    <!-- Puzzle 3: Definition of Done -->
+    <div class="puzzle-card" id="p3-card">
+      <div class="puzzle-num">Puzzle 3 / 4 · Definition of Done</div>
+      <h3>What counts as "Done"?</h3>
+      <p>Task: <strong>"Literature research for next paper"</strong>. Tick all conditions that must be fulfilled for this task to be truly <em>Done</em>.</p>
+
+      <div class="check-list" id="p3-checklist">
+        <label class="check-item"><input type="checkbox" value="correct" data-miss="Without a defined number of articles, you never know when to stop — the task has no clear end."> Number of articles to review has been defined</label>
+        <label class="check-item"><input type="checkbox" value="wrong" data-extra="Writing the paper is a separate, later task — don't include it in the research Definition of Done."> The paper has already been written</label>
+        <label class="check-item"><input type="checkbox" value="correct" data-miss="Without defined keywords the search is not reproducible — deciding them is part of completing this task."> Keywords for database search have been decided</label>
+        <label class="check-item"><input type="checkbox" value="wrong" data-extra="Choosing a target conference is a publication planning task — it happens after research is complete."> A target conference has been identified</label>
+        <label class="check-item"><input type="checkbox" value="correct" data-miss="Which databases you search must be decided upfront for systematic, reproducible literature research."> Databases to be searched have been selected</label>
+        <label class="check-item"><input type="checkbox" value="wrong" data-extra="Revision and proofreading belong to a writing task — at the research stage, there is no draft yet to revise."> Revision and proofreading is finished</label>
+        <label class="check-item"><input type="checkbox" value="correct" data-miss="'Literature research' is ambiguous — does it include reading the papers? This scope decision must be made upfront."> Decision made on whether reading is included in scope</label>
+        <label class="check-item"><input type="checkbox" value="correct" data-miss="In a PhD context, the supervisor defines expectations. A task is not Done until the supervisor agrees on what Done means."> Scope confirmed with supervisor</label>
+      </div>
+
+      <div class="mt-16 flex-row">
+        <button class="btn btn-secondary btn-sm" onclick="checkDOD()">Check answers</button>
+      </div>
+      <div id="p3-feedback" class="feedback"></div>
+      <button class="explain-btn" id="p3-explain-btn" onclick="toggleExplain('p3')">💡 Show explanation</button>
+      <div class="explain-panel" id="p3-explain">
+        The workshop asked: <strong>"When is a task actually done?"</strong> A clear <strong>Definition of Done</strong> removes ambiguity and prevents tasks from staying stuck in <em>In Progress</em>. Here is why each condition is correct or not for <em>"Literature research for next paper"</em>:
+        <br><br>
+        <strong style="color:#3fb950">✓ Number of articles to review has been defined</strong><br>
+        Without a target number, you never know when to stop searching. The workshop explicitly listed this as one of the open questions for this task.
+        <br><br>
+        <strong style="color:#ff7b72">✗ The paper has already been written</strong><br>
+        Writing the paper is an entirely separate task. Including it here would mix two distinct workflow steps — the Definition of Done must match the scope of <em>this</em> task only.
+        <br><br>
+        <strong style="color:#3fb950">✓ Keywords for database search have been decided</strong><br>
+        Without defined keywords the search is neither systematic nor reproducible. The workshop listed "Which keywords?" as a key open question for this task.
+        <br><br>
+        <strong style="color:#ff7b72">✗ A target conference has been identified</strong><br>
+        Choosing a conference belongs to the planning of the paper's publication — a separate task. Literature research is complete before that decision is made.
+        <br><br>
+        <strong style="color:#3fb950">✓ Databases to be searched have been selected</strong><br>
+        "Which databases?" was explicitly listed in the workshop. Searching without a defined set of databases produces inconsistent results.
+        <br><br>
+        <strong style="color:#ff7b72">✗ Revision and proofreading is finished</strong><br>
+        Revision belongs to a writing or editing task — it presupposes a draft that doesn't exist yet at the research stage.
+        <br><br>
+        <strong style="color:#3fb950">✓ Decision made on whether reading is included in scope</strong><br>
+        "Literature research" is ambiguous: does it mean finding sources, or also reading them? The workshop explicitly raised this question — the scope must be clarified upfront.
+        <br><br>
+        <strong style="color:#3fb950">✓ Scope confirmed with supervisor</strong><br>
+        In a PhD context, the supervisor defines expectations. A task cannot be "Done" if the supervisor hasn't agreed on what "Done" means for this research task.
+      </div>
+    </div>
+
+    <!-- Puzzle 4: Scrum vs Kanban -->
+    <div class="puzzle-card" id="p4-card">
+      <div class="puzzle-num">Puzzle 4 / 4 · Scrum vs. Kanban</div>
+      <h3>Assign each statement: Scrum or Kanban?</h3>
+      <p>Click the correct label for each statement. Use what you learned in the workshop.</p>
+
+      <div class="svk-grid" id="svk-grid"></div>
+
+      <div id="p4-feedback" class="feedback"></div>
+      <button class="explain-btn" id="p4-explain-btn" onclick="toggleExplain('p4')">💡 Show explanation</button>
+      <div class="explain-panel" id="p4-explain">
+        From the workshop: <strong>"Scrum – Rhythm: Sprints. Kanban – Rhythm: Continuous flow."</strong> Scrum teams should not make changes during the sprint; Kanban allows changes at any time. <em>Use cases: Scrum for paper or dissertation, Kanban for working with student assistants.</em> (Workshop slide: Key differences)
+      </div>
+
+      <div id="l1-code" class="code-reveal">
+        <div class="code-label">🔓 Security Code Unlocked</div>
+        <div class="code-value">SPRINT42</div>
+        <p>Note it down! You'll need it at the end. Proceed to Level 2.</p>
+        <button class="btn btn-primary mt-8" onclick="goLevel(2)">Enter Level 2 →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════ LEVEL 2 ════════════════════════════════════ -->
+<div id="screen-l2" class="screen">
+  <div class="screen-inner">
+    <div class="level-header l2">
+      <span class="level-badge">Level 2 of 4</span>
+      <h2>📅 The Calendar Tower</h2>
+      <p>The institute's clock mechanism is broken. Reconstruct the ideal time management system to set it back on track.</p>
+    </div>
+
+    <!-- Puzzle 5: 112 equation -->
+    <div class="puzzle-card" id="p5-card">
+      <div class="puzzle-num">Puzzle 1 / 4 · The 112-Hour Equation</div>
+      <h3>How many waking hours do you have per week?</h3>
+      <p>The workshop showed this calculation. Fill in the result:</p>
+      <p style="font-size:18px; font-weight:700; font-family: monospace;">168 (24 × 7) &minus; 56 (8 × 7) = <input type="number" class="text-input" id="p5-input" style="width:90px;display:inline-block;" placeholder="?"> hours</p>
+      <button class="btn btn-secondary btn-sm mt-8" onclick="check112()">Check</button>
+
+      <div id="p5-sub" style="display:none;" class="mt-16">
+        <p style="font-weight:600;">What does this number represent?</p>
+        <div class="mc-options" id="p5-mc">
+          <div class="mc-option" onclick="pick112MC(this,'wrong')"><div class="mc-letter">A</div>The number of hours we must work per week</div>
+          <div class="mc-option" onclick="pick112MC(this,'correct')"><div class="mc-letter">B</div>The number of waking hours per week we can actively shape ✓</div>
+          <div class="mc-option" onclick="pick112MC(this,'wrong')"><div class="mc-letter">C</div>The recommended hours of deep work per semester</div>
+          <div class="mc-option" onclick="pick112MC(this,'wrong')"><div class="mc-letter">D</div>The average PhD student's weekly overtime</div>
+        </div>
+      </div>
+
+      <div id="p5-feedback" class="feedback"></div>
+      <button class="explain-btn" id="p5-explain-btn" onclick="toggleExplain('p5')">💡 Show explanation</button>
+      <div class="explain-panel" id="p5-explain">
+        The workshop slide showed exactly: <strong>"168 (24 × 7) – 56 (8 × 7) = 112"</strong>. As Ali Abdaal says: <em>"Time is the single most valuable non-renewable resource. We can always make more money but not more time."</em> 112 waking hours per week — the question is how intentionally we use them.
+      </div>
+    </div>
+
+    <!-- Puzzle 6: Ideal Week Quiz -->
+    <div class="puzzle-card" id="p6-card">
+      <div class="puzzle-num">Puzzle 2 / 4 · Ideal Week Quiz</div>
+      <h3>5 Questions about the Trident Calendar System</h3>
+      <p>One correct answer per question. Based on the workshop content.</p>
+
+      <div id="p6-questions"></div>
+
+      <div id="p6-feedback" class="feedback"></div>
+      <button class="explain-btn" id="p6-explain-btn" onclick="toggleExplain('p6')">💡 Show explanation</button>
+      <div class="explain-panel" id="p6-explain">
+        The Trident Calendar System (introduced by Ali Abdaal) plans time on three nested levels: <strong>ideal year → ideal week → ideal day.</strong> The ideal day has two parts: (1) "Follow the calendar" — stick to the blocks you defined in your ideal week; (2) complete three daily quests in <strong>Work [PhD], Health, and Relationships.</strong>
+      </div>
+    </div>
+
+    <!-- Puzzle 7: Daily Quests assign -->
+    <div class="puzzle-card" id="p7-card">
+      <div class="puzzle-num">Puzzle 3 / 4 · Daily Quests</div>
+      <h3>Assign each activity to the correct Daily Quest category</h3>
+      <p>The three categories from the workshop are: <strong>Work [PhD]</strong>, <strong>Health</strong>, and <strong>Relationships</strong>.</p>
+
+      <div class="quest-assign" id="p7-assign">
+        <div class="qa-row"><div class="qa-activity">"Write chapter outline for the paper"</div>
+          <select class="qa-select" id="qa1" onchange="checkQuests()"><option value="">--</option><option value="work">Work [PhD]</option><option value="health">Health</option><option value="rel">Relationships</option></select></div>
+        <div class="qa-row"><div class="qa-activity">"Prepare for supervisor meeting"</div>
+          <select class="qa-select" id="qa2" onchange="checkQuests()"><option value="">--</option><option value="work">Work [PhD]</option><option value="health">Health</option><option value="rel">Relationships</option></select></div>
+        <div class="qa-row"><div class="qa-activity">"Go for a 30-minute run"</div>
+          <select class="qa-select" id="qa3" onchange="checkQuests()"><option value="">--</option><option value="work">Work [PhD]</option><option value="health">Health</option><option value="rel">Relationships</option></select></div>
+        <div class="qa-row"><div class="qa-activity">"Put phone away at 10 pm and sleep 8 hours"</div>
+          <select class="qa-select" id="qa4" onchange="checkQuests()"><option value="">--</option><option value="work">Work [PhD]</option><option value="health">Health</option><option value="rel">Relationships</option></select></div>
+        <div class="qa-row"><div class="qa-activity">"Have dinner with fellow PhD students"</div>
+          <select class="qa-select" id="qa5" onchange="checkQuests()"><option value="">--</option><option value="work">Work [PhD]</option><option value="health">Health</option><option value="rel">Relationships</option></select></div>
+        <div class="qa-row"><div class="qa-activity">"Call your parents"</div>
+          <select class="qa-select" id="qa6" onchange="checkQuests()"><option value="">--</option><option value="work">Work [PhD]</option><option value="health">Health</option><option value="rel">Relationships</option></select></div>
+      </div>
+
+      <div id="p7-feedback" class="feedback"></div>
+      <button class="explain-btn" id="p7-explain-btn" onclick="toggleExplain('p7')">💡 Show explanation</button>
+      <div class="explain-panel" id="p7-explain">
+        From the workshop: <strong>"The ideal day – Part 2: Three daily quests: Work [PhD] / Health / Relationships."</strong> Every day should contain at least one intentional action in each of these three life areas — not just work, but actively protecting health and relationships.
+      </div>
+    </div>
+
+    <!-- Puzzle 8: Quote blanks -->
+    <div class="puzzle-card" id="p8-card">
+      <div class="puzzle-num">Puzzle 4 / 4 · Complete the Quote</div>
+      <h3>Fill in the blanks</h3>
+      <p>This quote appeared twice in the workshop. It maps perfectly onto the Trident Calendar System.</p>
+
+      <p style="font-size:16px; line-height:2.2; margin: 16px 0;">
+        "Dream in
+        <select class="sum-cat-select" id="q8a"><option value="">--</option><option value="years">years</option><option value="months">months</option><option value="weeks">weeks</option><option value="daily">daily</option></select>.
+        Plan in
+        <select class="sum-cat-select" id="q8b"><option value="">--</option><option value="years">years</option><option value="months">months</option><option value="weeks">weeks</option><option value="daily">daily</option></select>.
+        Evaluate in
+        <select class="sum-cat-select" id="q8c"><option value="">--</option><option value="years">years</option><option value="months">months</option><option value="weeks">weeks</option><option value="daily">daily</option></select>.
+        Ship
+        <select class="sum-cat-select" id="q8d"><option value="">--</option><option value="years">years</option><option value="months">months</option><option value="weeks">weeks</option><option value="daily">daily</option></select>."
+        <br><span style="font-size:13px; color:var(--text-dim);">— D.J. Patil (former US Chief Data Scientist)</span>
+      </p>
+
+      <button class="btn btn-secondary btn-sm" onclick="checkQuote()">Check</button>
+
+      <div id="p8-feedback" class="feedback"></div>
+      <button class="explain-btn" id="p8-explain-btn" onclick="toggleExplain('p8')">💡 Show explanation</button>
+      <div class="explain-panel" id="p8-explain">
+        This quote appeared <strong>twice</strong> in the workshop slides (including as a <em>"REMINDER"</em> before the Atomic Habits section). It maps directly onto the Trident Calendar System: <em>ideal year (dream) → ideal month → ideal week (evaluate) → ideal day (ship daily).</em>
+      </div>
+
+      <div id="l2-code" class="code-reveal">
+        <div class="code-label">🔓 Security Code Unlocked</div>
+        <div class="code-value">TRIDENT24</div>
+        <p>Note it down! Proceed to Level 3.</p>
+        <button class="btn btn-primary mt-8" onclick="goLevel(3)">Enter Level 3 →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════ LEVEL 3 ════════════════════════════════════ -->
+<div id="screen-l3" class="screen">
+  <div class="screen-inner">
+    <div class="level-header l3">
+      <span class="level-badge">Level 3 of 4</span>
+      <h2>📥 The GTD Headquarters</h2>
+      <p>Prof. Zeitlos' inbox is completely overflowing. Bring order to the headquarters using Getting Things Done.</p>
+    </div>
+
+    <!-- Puzzle 9: Brain Dump → Buckets -->
+    <div class="puzzle-card" id="p9-card">
+      <div class="puzzle-num">Puzzle 1 / 4 · Brain Dump → Buckets</div>
+      <h3>Sort tasks into the correct GTD buckets</h3>
+      <p>Drag each task card into the correct bucket. Use the GTD system from the workshop.</p>
+
+      <div id="p9-source" class="drag-area" style="flex-wrap:wrap;"></div>
+
+      <div class="bucket-grid" id="p9-buckets">
+        <div class="drop-zone" data-bkt="calendar" ondragover="allowDrop(event)" ondrop="dropBucket(event)"><h4>📅 Calendar</h4></div>
+        <div class="drop-zone" data-bkt="next" ondragover="allowDrop(event)" ondrop="dropBucket(event)"><h4>▶️ Next Action</h4></div>
+        <div class="drop-zone" data-bkt="waiting" ondragover="allowDrop(event)" ondrop="dropBucket(event)"><h4>⏳ Waiting For</h4></div>
+        <div class="drop-zone" data-bkt="someday" ondragover="allowDrop(event)" ondrop="dropBucket(event)"><h4>🌙 Someday/Maybe</h4></div>
+        <div class="drop-zone" data-bkt="reference" ondragover="allowDrop(event)" ondrop="dropBucket(event)"><h4>📂 Reference</h4></div>
+        <div class="drop-zone" data-bkt="project" ondragover="allowDrop(event)" ondrop="dropBucket(event)"><h4>🗂️ Project Plans</h4></div>
+        <div class="drop-zone" data-bkt="trash" ondragover="allowDrop(event)" ondrop="dropBucket(event)"><h4>🗑️ Trash</h4></div>
+      </div>
+
+      <div id="p9-feedback" class="feedback"></div>
+      <button class="explain-btn" id="p9-explain-btn" onclick="toggleExplain('p9')">💡 Show explanation</button>
+      <div class="explain-panel" id="p9-explain">
+        The workshop listed these GTD buckets: <strong>Inbox / Trash / Someday–Maybe / References / Do it (&lt;2 min) / Next Action / Waiting For / Project Plans / Calendar.</strong> The core insight: <em>"The mind is for having ideas, not holding them"</em> — David Allen. Everything captured must be clarified into one of these homes.
+      </div>
+    </div>
+
+    <!-- Puzzle 10: 2-Minute Rule -->
+    <div class="puzzle-card" id="p10-card">
+      <div class="puzzle-num">Puzzle 2 / 4 · The 2-Minute Rule</div>
+      <h3>Do it now or plan it?</h3>
+      <p>Classify each scenario: can it be done in under 2 minutes? If yes → do it now. If no → plan it.</p>
+
+      <div id="p10-items"></div>
+
+      <div id="p10-feedback" class="feedback"></div>
+      <button class="explain-btn" id="p10-explain-btn" onclick="toggleExplain('p10')">💡 Show explanation</button>
+      <div class="explain-panel" id="p10-explain">
+        From the workshop <strong>Organize</strong> step: <em>"If completion takes less than 2 minutes → do it now."</em> This prevents your task list from being cluttered with tiny items and keeps your attention where it matters most — longer, meaningful work.
+      </div>
+    </div>
+
+    <!-- Puzzle 11: Actionable or Not -->
+    <div class="puzzle-card" id="p11-card">
+      <div class="puzzle-num">Puzzle 3 / 4 · Actionable or Not?</div>
+      <h3>Is the next step clear?</h3>
+      <p>For each task, decide: is it <strong>actionable</strong> (you know exactly what to do next) or <strong>not actionable</strong> (too vague, no clear next step)?</p>
+
+      <div id="p11-items"></div>
+
+      <div id="p11-feedback" class="feedback"></div>
+      <button class="explain-btn" id="p11-explain-btn" onclick="toggleExplain('p11')">💡 Show explanation</button>
+      <div class="explain-panel" id="p11-explain">
+        From the <strong>Clarify</strong> step: <em>"Is it actionable? If yes: what is the next concrete step?"</em> Workshop example: <em>"Hand in term paper" → next step: start literature research. "Create a shared flat cleaning plan" → next step: talk to flatmates.</em> A task is actionable when you know exactly what physical action to take next.
+      </div>
+    </div>
+
+    <!-- Puzzle 12: GTD Steps order -->
+    <div class="puzzle-card" id="p12-card">
+      <div class="puzzle-num">Puzzle 4 / 4 · GTD Steps in Order</div>
+      <h3>Put the 5 GTD steps in the correct sequence</h3>
+      <p>Drag the steps into the right order.</p>
+
+      <div class="order-list" id="p12-order"></div>
+      <button class="btn btn-secondary btn-sm mt-16" onclick="checkGTDOrder()">Check order</button>
+
+      <div id="p12-feedback" class="feedback"></div>
+      <button class="explain-btn" id="p12-explain-btn" onclick="toggleExplain('p12')">💡 Show explanation</button>
+      <div class="explain-panel" id="p12-explain">
+        From the workshop: <strong>"Getting Things Done – Based on 5 steps: Capture, Clarify, Organize, Reflect, Engage."</strong>
+        <br>• <em>Capture:</em> get everything out of your head
+        <br>• <em>Clarify:</em> is it actionable?
+        <br>• <em>Organize:</em> assign to lists and categories
+        <br>• <em>Reflect:</em> weekly review of all lists
+        <br>• <em>Engage:</em> process tasks based on context, time, and energy level
+      </div>
+
+      <div id="l3-code" class="code-reveal">
+        <div class="code-label">🔓 Security Code Unlocked</div>
+        <div class="code-value">CAPTURE5</div>
+        <p>Note it down! Proceed to Level 4 — the final challenge.</p>
+        <button class="btn btn-primary mt-8" onclick="goLevel(4)">Enter Level 4 →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════ LEVEL 4 ════════════════════════════════════ -->
+<div id="screen-l4" class="screen">
+  <div class="screen-inner">
+    <div class="level-header l4">
+      <span class="level-badge">Level 4 of 4</span>
+      <h2>⚗️ The Habits Laboratory</h2>
+      <p>The final laboratory. Behavioral patterns are analyzed here. Master the science of habits to unlock the last code.</p>
+    </div>
+
+    <!-- Puzzle 13: Habit Loop -->
+    <div class="puzzle-card" id="p13-card">
+      <div class="puzzle-num">Puzzle 1 / 4 · The Habit Loop</div>
+      <h3>Identify the four Habit Loop phases</h3>
+      <p>Read the scenario below (taken directly from the workshop). Assign each element to the correct Habit Loop phase.</p>
+
+      <div class="note-box" style="border-left-color: var(--accent4); margin-bottom:16px; font-style:normal;">
+        A push notification arrives on your smartphone ("New message"). You feel a need for distraction, entertainment or social confirmation. You immediately open Instagram, TikTok or WhatsApp — you were just about to start working. You feel short-term fun and connection, but also guilt about postponing the actual task.
+      </div>
+
+      <div id="p13-items"></div>
+
+      <div id="p13-feedback" class="feedback"></div>
+      <button class="explain-btn" id="p13-explain-btn" onclick="toggleExplain('p13')">💡 Show explanation</button>
+      <div class="explain-panel" id="p13-explain">
+        Directly from the workshop slide <strong>"Habit Loop (negative example)"</strong>:
+        <br>• <em>Cue</em> = Push notification on the smartphone
+        <br>• <em>Craving</em> = Need for distraction, entertainment or social confirmation
+        <br>• <em>Response</em> = Immediately opening Instagram, TikTok or WhatsApp
+        <br>• <em>Reward</em> = Short-term feeling of fun, connection or relaxation
+        <br>(Source: Clear, J. (2018). Atomic Habits)
+      </div>
+    </div>
+
+    <!-- Puzzle 14: 1% calculation -->
+    <div class="puzzle-card" id="p14-card">
+      <div class="puzzle-num">Puzzle 2 / 4 · The 1% Calculation</div>
+      <h3>The power of compounding habits</h3>
+      <p>The workshop showed this calculation for a 15-week semester (105 days).</p>
+
+      <p style="font-weight:600; margin-bottom:12px;">If you get 1% better every day for 105 days (15 weeks × 7 days), how much better are you at the end?</p>
+      <div class="mc-options" id="p14-mc1">
+        <div class="mc-option" onclick="pickMC(this,'wrong','p14-fb1')"><div class="mc-letter">A</div>About 1.05× better</div>
+        <div class="mc-option" onclick="pickMC(this,'wrong','p14-fb1')"><div class="mc-letter">B</div>About 1.5× better</div>
+        <div class="mc-option" onclick="pickMC(this,'correct','p14-fb1')"><div class="mc-letter">C</div>About 2.84× better</div>
+        <div class="mc-option" onclick="pickMC(this,'wrong','p14-fb1')"><div class="mc-letter">D</div>About 10× better</div>
+      </div>
+      <div id="p14-fb1" class="feedback"></div>
+
+      <p style="font-weight:600; margin: 16px 0 12px;">And if you get 1% worse every day for those same 105 days?</p>
+      <div class="mc-options" id="p14-mc2">
+        <div class="mc-option" onclick="pickMC14b(this,'wrong')"><div class="mc-letter">A</div>About 0.9× (almost the same)</div>
+        <div class="mc-option" onclick="pickMC14b(this,'correct')"><div class="mc-letter">B</div>About 0.35× (less than half as capable)</div>
+        <div class="mc-option" onclick="pickMC14b(this,'wrong')"><div class="mc-letter">C</div>About 0.01× (nearly nothing)</div>
+        <div class="mc-option" onclick="pickMC14b(this,'wrong')"><div class="mc-letter">D</div>About 0.5× (exactly half)</div>
+      </div>
+
+      <div id="p14-feedback" class="feedback"></div>
+      <button class="explain-btn" id="p14-explain-btn" onclick="toggleExplain('p14')">💡 Show explanation</button>
+      <div class="explain-panel" id="p14-explain">
+        Directly from the workshop: <strong>"15 weeks × 7 days = 105 days. 1.01¹⁰⁵ = 2.84 / 0.99¹⁰⁵ = 0.35."</strong> (Source: Clear, J. (2018). Atomic Habits). This is why <em>consistency beats intensity</em> — small daily improvements compound dramatically over a semester.
+      </div>
+    </div>
+
+    <!-- Puzzle 15: 4 Laws -->
+    <div class="puzzle-card" id="p15-card">
+      <div class="puzzle-num">Puzzle 3 / 4 · The 4 Laws of Good Habits</div>
+      <h3>Sort each strategy into the correct law</h3>
+      <p>Drag the strategy cards into the correct law zone. There are 2 strategies per law.</p>
+
+      <div id="p15-source" class="drag-area" style="flex-wrap:wrap;"></div>
+
+      <div class="habit-law-grid" id="p15-laws">
+        <div class="law-zone drop-zone" data-law="obvious" ondragover="allowDrop(event)" ondrop="dropLaw(event)">
+          <h4>1. Make it obvious</h4>
+        </div>
+        <div class="law-zone drop-zone" data-law="attractive" ondragover="allowDrop(event)" ondrop="dropLaw(event)">
+          <h4>2. Make it attractive</h4>
+        </div>
+        <div class="law-zone drop-zone" data-law="easy" ondragover="allowDrop(event)" ondrop="dropLaw(event)">
+          <h4>3. Make it easy</h4>
+        </div>
+        <div class="law-zone drop-zone" data-law="satisfying" ondragover="allowDrop(event)" ondrop="dropLaw(event)">
+          <h4>4. Make it satisfying</h4>
+        </div>
+      </div>
+
+      <div id="p15-feedback" class="feedback"></div>
+      <button class="explain-btn" id="p15-explain-btn" onclick="toggleExplain('p15')">💡 Show explanation</button>
+      <div class="explain-panel" id="p15-explain">
+        From the workshop: <strong>"How to create a good habit (4 laws): Make it obvious! Make it attractive! Make it easy! Make it satisfying!"</strong> (Clear, J. (2018). Atomic Habits).
+        Formulation tip from the workshop: <em>"I will [behavior] at [time] in [this place]"</em> — e.g., "I will read a book in my bedroom for 15 minutes every day at 6 a.m."
+      </div>
+    </div>
+
+    <!-- Puzzle 16: Habit Stacking correct formulation -->
+    <div class="puzzle-card" id="p16-card">
+      <div class="puzzle-num">Puzzle 4 / 4 · Habit Stacking</div>
+      <h3>Which formulation is correct?</h3>
+      <p>The workshop introduced Habit Stacking with the template: <strong>"After [current habit] I will [new habit]."</strong> Which of the following is correctly formulated?</p>
+
+      <div class="mc-options" id="p16-mc">
+        <div class="mc-option" onclick="pickHSMC(this,'wrong')"><div class="mc-letter">A</div>"I want to read more at some point." <span style="color:var(--text-dim); font-size:12px;">— no anchor, no time</span></div>
+        <div class="mc-option" onclick="pickHSMC(this,'correct')"><div class="mc-letter">B</div>"After my morning coffee, I will read my textbook for 10 minutes." <span style="color:var(--text-dim); font-size:12px;">— correct format with clear anchor</span></div>
+        <div class="mc-option" onclick="pickHSMC(this,'wrong')"><div class="mc-letter">C</div>"I will stop checking emails first thing in the morning." <span style="color:var(--text-dim); font-size:12px;">— negatively framed, no new behavior</span></div>
+        <div class="mc-option" onclick="pickHSMC(this,'wrong')"><div class="mc-letter">D</div>"Sometimes after sport I might read something." <span style="color:var(--text-dim); font-size:12px;">— non-committal, no fixed anchor</span></div>
+      </div>
+
+      <div id="p16-feedback" class="feedback"></div>
+      <button class="explain-btn" id="p16-explain-btn" onclick="toggleExplain('p16')">💡 Show explanation</button>
+      <div class="explain-panel" id="p16-explain">
+        From the workshop: <strong>"Habit Stacking: After [current habit] I will [new habit]."</strong> The template requires a concrete existing habit as the anchor (the <em>cue</em>) and a specific new behavior.
+        <br>• Option A has no anchor and no concrete timing.
+        <br>• Option C defines what NOT to do instead of what TO do — it's not a habit stacking formula.
+        <br>• Option D uses "sometimes" and "might" — too vague to trigger a reliable cue.
+        <br>Option B is the correct format: clear existing habit (morning coffee) + specific new behavior (10-min reading).
+      </div>
+
+      <div id="l4-code" class="code-reveal">
+        <div class="code-label">🔓 Security Code Unlocked</div>
+        <div class="code-value">ATOMIC1</div>
+        <p>Note it down! All four codes are now unlocked. Proceed to submit your dissertation!</p>
+        <button class="btn btn-primary mt-8" onclick="goFinal()">🎓 Submit Dissertation →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════ FINAL ════════════════════════════════════ -->
+<div class="confetti-wrap" id="confetti"></div>
+
+<!-- ════════════════════════════════ SCRIPT ════════════════════════════════════ -->
+<script>
+// ── Game State ──────────────────────────────────────────────────────────────
+const gs = {
+  scores: [0, 0, 0, 0],
+  puzzleDone: Array(17).fill(false),
+  timerSecs: 90 * 60,
+  timerInterval: null,
+  timerStarted: null
+};
+
+// ── Timer ───────────────────────────────────────────────────────────────────
+function startTimer() {
+  gs.timerStarted = Date.now();
+  gs.timerInterval = setInterval(() => {
+    if (gs.timerSecs <= 0) {
+      clearInterval(gs.timerInterval);
+      document.getElementById('timer-display').textContent = '00:00';
+      document.getElementById('timeover-banner').classList.add('show');
+      return;
+    }
+    gs.timerSecs--;
+    const m = String(Math.floor(gs.timerSecs / 60)).padStart(2, '0');
+    const s = String(gs.timerSecs % 60).padStart(2, '0');
+    document.getElementById('timer-display').textContent = m + ':' + s;
+    if (gs.timerSecs < 300) document.getElementById('timer').style.color = '#ff7b72';
+    else if (gs.timerSecs < 600) document.getElementById('timer').style.color = '#d29922';
+  }, 1000);
+}
+
+function totalScore() { return gs.scores.reduce((a, b) => a + b, 0); }
+function updateScoreHUD() {
+  document.getElementById('score-display').textContent = totalScore();
+  const colors = ['c1','c2','c3','c4'];
+  gs.scores.forEach((s, i) => {
+    const chip = document.getElementById('chip' + (i+1));
+    chip.textContent = 'L' + (i+1) + ': ' + s + '/25';
+    chip.className = 'level-chip' + (s > 0 ? ' ' + colors[i] : '');
+  });
+}
+function addScore(level, pts) { gs.scores[level - 1] = Math.min(25, gs.scores[level - 1] + pts); updateScoreHUD(); }
+
+// ── Navigation ───────────────────────────────────────────────────────────────
+const navIds = { home:'nav-home', 1:'nav-l1', 2:'nav-l2', 3:'nav-l3', 4:'nav-l4' };
+let gameStarted = false;
+let l2Inited = false;
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0, 0);
+  // update nav active state
+  const key = id === 'screen-intro' ? 'home' : parseInt(id.replace('screen-l',''));
+  Object.entries(navIds).forEach(([k, btnId]) => {
+    document.getElementById(btnId).classList.toggle('nav-active', String(k) === String(key));
+  });
+}
+
+function navTo(dest) {
+  if (dest === 'home') { showScreen('screen-intro'); return; }
+  if (!gameStarted) { startGame(); return; }
+  showScreen('screen-l' + dest);
+  if (dest === 2 && !l2Inited) { initLevel2(); l2Inited = true; }
+}
+
+function startGame() {
+  if (!gameStarted) {
+    gameStarted = true;
+    initLevel1(); initSVK(); initLevel3(); initLevel4();
+    startTimer();
+    document.getElementById('start-btn').textContent = '▶️ Resume';
+  }
+  showScreen('screen-l1');
+}
+
+function goLevel(n) {
+  showScreen('screen-l' + n);
+  if (n === 2 && !l2Inited) { initLevel2(); l2Inited = true; }
+}
+
+function goFinal() { navTo('home'); }
+
+function markLevelDone(n) {
+  document.getElementById('ps' + n).classList.add('done-' + n);
+}
+
+// ── Explain toggle ───────────────────────────────────────────────────────────
+function toggleExplain(id) {
+  const panel = document.getElementById(id + '-explain');
+  const btn = document.getElementById(id + '-explain-btn');
+  if (panel.classList.contains('show')) {
+    panel.classList.remove('show');
+    btn.textContent = '💡 Show explanation';
+  } else {
+    panel.classList.add('show');
+    btn.textContent = '💡 Hide explanation';
+  }
+}
+function showExplainBtn(id) { document.getElementById(id + '-explain-btn').classList.add('show'); }
+
+function showFeedback(id, correct, msg) {
+  const el = document.getElementById(id + '-feedback');
+  el.textContent = (correct ? '✓ ' : '✗ ') + msg;
+  el.className = 'feedback show ' + (correct ? 'correct' : 'wrong');
+  showExplainBtn(id);
+}
+
+// ── Drag & Drop helpers (mouse + touch) ──────────────────────────────────────
+let dragData = null;
+let touchClone = null;
+let touchOffX = 0, touchOffY = 0;
+
+function allowDrop(e) { e.preventDefault(); e.currentTarget.classList.add('over'); }
+function dragLeave(e) { e.currentTarget.classList.remove('over'); }
+
+function addTouchDrag(el, getId) {
+  el.addEventListener('touchstart', e => {
+    e.preventDefault();
+    dragData = getId(el);
+    el.classList.add('dragging');
+    const t = e.touches[0];
+    const r = el.getBoundingClientRect();
+    touchOffX = t.clientX - r.left;
+    touchOffY = t.clientY - r.top;
+    touchClone = el.cloneNode(true);
+    touchClone.style.cssText = `position:fixed;pointer-events:none;opacity:.75;z-index:9999;
+      width:${r.width}px;left:${t.clientX - touchOffX}px;top:${t.clientY - touchOffY}px;`;
+    document.body.appendChild(touchClone);
+  }, { passive: false });
+
+  el.addEventListener('touchmove', e => {
+    e.preventDefault();
+    const t = e.touches[0];
+    if (touchClone) {
+      touchClone.style.left = (t.clientX - touchOffX) + 'px';
+      touchClone.style.top  = (t.clientY - touchOffY) + 'px';
+    }
+    document.querySelectorAll('.drop-zone').forEach(z => z.classList.remove('over'));
+    const target = document.elementFromPoint(t.clientX, t.clientY);
+    const zone = target && target.closest('.drop-zone');
+    if (zone) zone.classList.add('over');
+  }, { passive: false });
+
+  el.addEventListener('touchend', e => {
+    e.preventDefault();
+    el.classList.remove('dragging');
+    if (touchClone) { touchClone.remove(); touchClone = null; }
+    const t = e.changedTouches[0];
+    const target = document.elementFromPoint(t.clientX, t.clientY);
+    const zone = target && target.closest('.drop-zone');
+    document.querySelectorAll('.drop-zone').forEach(z => z.classList.remove('over'));
+    if (!zone || !dragData) { dragData = null; return; }
+    // fire the appropriate drop handler
+    if (zone.dataset.col !== undefined) dropKanban({ preventDefault:()=>{}, currentTarget: zone });
+    else if (zone.dataset.bkt !== undefined) dropBucket({ preventDefault:()=>{}, currentTarget: zone });
+    else if (zone.dataset.law !== undefined) dropLaw({ preventDefault:()=>{}, currentTarget: zone });
+    dragData = null;
+  }, { passive: false });
+}
+
+// ════════════════════════════════ LEVEL 1 ═══════════════════════════════════
+
+const kanbanCards = [
+  { id: 'kc1', text: 'Literature review for the paper – not yet started', col: 'todo' },
+  { id: 'kc2', text: 'Chapter 2 is currently being written', col: 'doing' },
+  { id: 'kc3', text: 'Chapter 3 is waiting for supervisor feedback', col: 'review' },
+  { id: 'kc4', text: 'Abstract has been approved and submitted', col: 'done' },
+  { id: 'kc5', text: 'Methodology section to be tackled next week', col: 'todo' },
+  { id: 'kc6', text: 'Data analysis is currently running', col: 'doing' },
+  { id: 'kc7', text: 'Introduction is with the co-author for checking', col: 'review' },
+  { id: 'kc8', text: 'Research question is finally formulated and approved', col: 'done' },
+];
+
+function initLevel1() {
+  const src = document.getElementById('p1-source');
+  src.innerHTML = '';
+  // Shuffle cards
+  const shuffled = [...kanbanCards].sort(() => Math.random() - 0.5);
+  shuffled.forEach(c => {
+    const el = document.createElement('div');
+    el.className = 'drag-card'; el.id = c.id;
+    el.draggable = true; el.textContent = c.text;
+    el.dataset.correct = c.col;
+    el.addEventListener('dragstart', e => { dragData = c.id; el.classList.add('dragging'); });
+    el.addEventListener('dragend', () => el.classList.remove('dragging'));
+    addTouchDrag(el, e => e.id);
+    src.appendChild(el);
+  });
+  document.querySelectorAll('#p1-board .drop-zone').forEach(z => {
+    z.addEventListener('dragleave', dragLeave);
+  });
+}
+
+let kanbanCorrect = 0;
+function dropKanban(e) {
+  e.preventDefault(); e.currentTarget.classList.remove('over');
+  if (!dragData) return;
+  const card = document.getElementById(dragData);
+  if (!card || card.classList.contains('placed-correct')) return;
+  const zone = e.currentTarget;
+  const zoneCol = zone.dataset.col;
+  const correctCol = card.dataset.correct;
+  zone.appendChild(card);
+  card.draggable = false;
+  if (zoneCol === correctCol) {
+    card.classList.add('placed-correct');
+    kanbanCorrect++;
+    if (kanbanCorrect === kanbanCards.length) {
+      gs.puzzleDone[1] = true;
+      addScore(1, 7);
+      showFeedback('p1', true, 'All 8 cards correctly placed! The board is restored.');
+      checkL1Complete();
+    }
+  } else {
+    card.classList.add('placed-wrong');
+    setTimeout(() => {
+      card.classList.remove('placed-wrong');
+      card.draggable = true;
+      document.getElementById('p1-source').appendChild(card);
+    }, 900);
+  }
+  dragData = null;
+}
+
+// P2: Stand-Up
+let suMatchDone = false, suScenarioDone = false;
+function checkSU() {
+  const su1 = document.getElementById('su1').value;
+  const su2 = document.getElementById('su2').value;
+  const su3 = document.getElementById('su3').value;
+  const answers = { su1: 'past', su2: 'present', su3: 'blocker' };
+  if (!su1 || !su2 || !su3) return;
+  let correct = 0;
+  [['su1', su1], ['su2', su2], ['su3', su3]].forEach(([id, val]) => {
+    const el = document.getElementById(id);
+    if (val === answers[id]) { el.className = 'sum-cat-select correct'; correct++; }
+    else { el.className = 'sum-cat-select wrong'; }
+  });
+  if (correct === 3 && !suMatchDone) { suMatchDone = true; }
+  if (suMatchDone && suScenarioDone && !gs.puzzleDone[2]) {
+    gs.puzzleDone[2] = true;
+    addScore(1, 6);
+    showFeedback('p2', true, 'Correct! You know the three Stand-Up questions and can identify blockers.');
+    checkL1Complete();
+  }
+}
+function pickSUScenario(el, result) {
+  if (suScenarioDone) return;
+  document.querySelectorAll('#p2-scenario .mc-option').forEach(o => o.classList.add('disabled'));
+  el.classList.add(result);
+  if (result === 'correct') {
+    suScenarioDone = true;
+    if (suMatchDone && !gs.puzzleDone[2]) {
+      gs.puzzleDone[2] = true;
+      addScore(1, 6);
+      showFeedback('p2', true, 'Correct! An unanswered email that blocks your progress is a classic Blocker / Impediment.');
+      checkL1Complete();
+    }
+  } else {
+    showFeedback('p2', false, 'Not quite. Think about which category covers things that are stopping your work.');
+    setTimeout(() => {
+      document.querySelectorAll('#p2-scenario .mc-option').forEach(o => { o.classList.remove('disabled', 'wrong'); });
+    }, 1200);
+  }
+}
+
+// P3: Definition of Done
+let dodDone = false;
+function checkDOD() {
+  if (dodDone) return;
+  const items = document.querySelectorAll('#p3-checklist .check-item');
+  let allCorrect = true;
+  const extraHints = [];   // wrongly included (out-of-scope items ticked)
+  const missHints = [];    // missing (in-scope items not ticked)
+
+  items.forEach(item => {
+    const cb = item.querySelector('input');
+    const isCorrect = cb.value === 'correct';
+    const isChecked = cb.checked;
+    item.classList.remove('correct-checked', 'wrong-checked');
+    if (isCorrect && isChecked) {
+      item.classList.add('correct-checked');
+    } else if (!isCorrect && !isChecked) {
+      // correctly excluded — no action
+    } else if (isCorrect && !isChecked) {
+      item.classList.add('wrong-checked');
+      allCorrect = false;
+      if (cb.dataset.miss) missHints.push(cb.dataset.miss);
+    } else {
+      item.classList.add('wrong-checked');
+      allCorrect = false;
+      if (cb.dataset.extra) extraHints.push(cb.dataset.extra);
+    }
+    cb.disabled = true;
+    item.style.cursor = 'default';
+  });
+
+  if (allCorrect) {
+    dodDone = true;
+    gs.puzzleDone[3] = true;
+    addScore(1, 6);
+    showFeedback('p3', true, 'Perfect! You identified all 5 conditions that define "Done" for this literature research task.');
+    checkL1Complete();
+  } else {
+    let hintHtml = 'Not quite — check the highlighted items and try again.<br>';
+    if (extraHints.length > 0) {
+      hintHtml += `<br><strong>Out of scope (untick these):</strong><ul style="margin:4px 0 0 16px">` +
+        extraHints.map(h => `<li>${h}</li>`).join('') + `</ul>`;
+    }
+    if (missHints.length > 0) {
+      hintHtml += `<br><strong>Still missing (tick these):</strong><ul style="margin:4px 0 0 16px">` +
+        missHints.map(h => `<li>${h}</li>`).join('') + `</ul>`;
+    }
+    showFeedback('p3', false, hintHtml);
+    // re-enable for retry but keep color highlights so the user can see which items to fix
+    items.forEach(item => { const cb = item.querySelector('input'); cb.disabled = false; item.style.cursor = 'pointer'; });
+  }
+}
+
+// P4: Scrum vs Kanban
+const svkData = [
+  { text: 'Sprints (fixed 1–4 week periods)', correct: 'scrum' },
+  { text: 'Continuous flow', correct: 'kanban' },
+  { text: 'WIP limit', correct: 'kanban' },
+  { text: 'Sprint Retrospective', correct: 'scrum' },
+  { text: 'Changes may occur at any time', correct: 'kanban' },
+  { text: 'Teams should not make changes during the period', correct: 'scrum' },
+  { text: 'Good for writing a paper or dissertation', correct: 'scrum' },
+  { text: 'Good for working with student assistants', correct: 'kanban' },
+  { text: 'Sprint Planning meeting', correct: 'scrum' },
+  { text: 'Pull-based workflow', correct: 'kanban' },
+];
+let svkCorrectCount = 0;
+function initSVK() {
+  const grid = document.getElementById('svk-grid');
+  grid.innerHTML = '';
+  svkData.forEach((item, i) => {
+    const div = document.createElement('div');
+    div.className = 'svk-card';
+    div.innerHTML = `<div class="svk-text">${item.text}</div>
+      <div class="svk-choice-row">
+        <button class="svk-btn" onclick="pickSVK(this,${i},'scrum')">Scrum</button>
+        <button class="svk-btn" onclick="pickSVK(this,${i},'kanban')">Kanban</button>
+      </div>`;
+    grid.appendChild(div);
+  });
+}
+function pickSVK(btn, idx, choice) {
+  const card = btn.closest('.svk-card');
+  if (card.dataset.done) return;
+  const correct = svkData[idx].correct;
+  const btns = card.querySelectorAll('.svk-btn');
+  btns.forEach(b => b.classList.add('svk-disabled'));
+  if (choice === correct) {
+    btn.classList.add('svk-correct');
+    card.dataset.done = '1';
+    svkCorrectCount++;
+    if (svkCorrectCount === svkData.length && !gs.puzzleDone[4]) {
+      gs.puzzleDone[4] = true;
+      addScore(1, 6);
+      showFeedback('p4', true, 'Excellent! You correctly classified all 10 statements.');
+      document.getElementById('l1-code').classList.add('show');
+      markLevelDone(1);
+    }
+  } else {
+    btn.classList.add('svk-wrong');
+    btns.forEach(b => { if (b !== btn) b.classList.remove('svk-disabled'); });
+    card.dataset.done = '';
+  }
+}
+
+function checkL1Complete() { /* code reveal triggered by final puzzle (P4) */ }
+
+// ════════════════════════════════ LEVEL 2 ═══════════════════════════════════
+
+function initLevel2() { initP6Questions(); }
+
+// P5: 112
+let p5step1done = false;
+function check112() {
+  const val = parseInt(document.getElementById('p5-input').value);
+  if (val === 112) {
+    document.getElementById('p5-input').classList.add('correct');
+    p5step1done = true;
+    document.getElementById('p5-sub').style.display = 'block';
+  } else {
+    document.getElementById('p5-input').classList.add('wrong');
+    setTimeout(() => document.getElementById('p5-input').classList.remove('wrong'), 1000);
+    showFeedback('p5', false, 'Not quite. Tip: 168 total hours minus 56 sleeping hours.');
+  }
+}
+function pick112MC(el, result) {
+  if (!p5step1done) return;
+  document.querySelectorAll('#p5-mc .mc-option').forEach(o => o.classList.add('disabled'));
+  el.classList.add(result);
+  if (result === 'correct') {
+    gs.puzzleDone[5] = true;
+    addScore(2, 7);
+    showFeedback('p5', true, 'Correct! 112 waking hours per week that we can actively shape.');
+    checkL2Complete();
+  } else {
+    showFeedback('p5', false, 'Not quite — remember Ali Abdaal\'s framing of these hours.');
+    setTimeout(() => document.querySelectorAll('#p5-mc .mc-option').forEach(o => o.classList.remove('disabled','wrong','correct')), 1200);
+  }
+}
+
+// P6: Ideal Week Quiz
+const p6Questions = [
+  { q: 'When should Deep Work (writing, analysis, complex thinking) ideally be scheduled?',
+    options: ['Whenever a free slot appears', 'During your personal peak hours / in the morning', 'In the evenings after all meetings', 'It doesn\'t matter when, just get it done'],
+    correct: 1,
+    explain: 'From the workshop: Protect your peak hours! Deep Work requires high cognitive load and should be placed in your personal energy peak — typically mornings for most people.' },
+  { q: 'Which activities are best suited for "shallow work" time slots?',
+    options: ['Writing dissertation chapters', 'Deep literature analysis', 'Emails, admin tasks, and short meetings', 'Statistical data analysis'],
+    correct: 2,
+    explain: 'Shallow work has low cognitive load. The ideal week separates deep and shallow slots so that peak energy goes to the work that matters most.' },
+  { q: 'What is the core idea of the Trident Calendar System?',
+    options: ['Block every hour of every day in detail', 'Plan consistently across three levels: ideal year → ideal week → ideal day', 'Schedule only work tasks, not personal time', 'Use a paper calendar instead of digital tools'],
+    correct: 1,
+    explain: 'The Trident Calendar System (Ali Abdaal) plans time on three nested levels: ideal year (big goals) → ideal week (recurring blocks) → ideal day (follow the week + 3 quests).' },
+  { q: 'What are the three categories of Daily Quests?',
+    options: ['Read, Write, Exercise', 'Work [PhD], Admin, Learning', 'Work [PhD], Health, Relationships', 'Morning, Afternoon, Evening'],
+    correct: 2,
+    explain: 'From the workshop slide: "The ideal day – Part 2: Three daily quests: Work [PhD] / Health / Relationships." These three areas ensure life balance, not just PhD productivity.' },
+  { q: 'Why should health activities be scheduled as fixed blocks in the Ideal Week?',
+    options: ['To impress colleagues', 'Because health must be actively protected — it won\'t happen unless planned', 'To fill unused calendar slots', 'Because the university requires it'],
+    correct: 1,
+    explain: 'Ali Abdaal: "Time is the single most valuable non-renewable resource. We can always make more money but not more time." Health blocks must be defended just like Deep Work blocks.' },
+];
+let p6answers = Array(5).fill(null), p6locked = Array(5).fill(false);
+function initP6Questions() {
+  const container = document.getElementById('p6-questions');
+  container.innerHTML = '';
+  p6Questions.forEach((q, qi) => {
+    const div = document.createElement('div');
+    div.style = 'margin-bottom:20px;';
+    div.innerHTML = `<p style="font-weight:600; margin-bottom:8px;">${qi+1}. ${q.q}</p>
+      <div class="mc-options" id="p6q${qi}">
+        ${q.options.map((o, oi) => `<div class="mc-option" onclick="pickP6(${qi},${oi})"><div class="mc-letter">${'ABCD'[oi]}</div>${o}</div>`).join('')}
+      </div>`;
+    container.appendChild(div);
+  });
+}
+function pickP6(qi, oi) {
+  if (p6locked[qi]) return;
+  p6locked[qi] = true;
+  const opts = document.querySelectorAll(`#p6q${qi} .mc-option`);
+  opts.forEach(o => o.classList.add('disabled'));
+  const correct = p6Questions[qi].correct;
+  opts[oi].classList.add(oi === correct ? 'correct' : 'wrong');
+  if (oi === correct) { p6answers[qi] = true; }
+  else { p6answers[qi] = false; opts[correct].classList.add('correct'); }
+  if (p6locked.every(Boolean) && !gs.puzzleDone[6]) {
+    gs.puzzleDone[6] = true;
+    const cnt = p6answers.filter(Boolean).length;
+    // 1pt per correct answer (max 5) + 1 bonus for all correct = max 6
+    addScore(2, Math.min(6, cnt + (cnt === 5 ? 1 : 0)));
+    showFeedback('p6', cnt >= 4, `You got ${cnt}/5 questions correct.`);
+    checkL2Complete();
+  }
+}
+
+// P7: Quest assign
+const questCorrect = { qa1:'work', qa2:'work', qa3:'health', qa4:'health', qa5:'rel', qa6:'rel' };
+let questDone = false;
+function checkQuests() {
+  const ids = ['qa1','qa2','qa3','qa4','qa5','qa6'];
+  if (!ids.every(id => document.getElementById(id).value)) return;
+  let correct = 0;
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el.value === questCorrect[id]) { el.className = 'qa-select correct'; correct++; }
+    else { el.className = 'qa-select wrong'; }
+  });
+  if (correct === 6 && !questDone) {
+    questDone = true;
+    gs.puzzleDone[7] = true;
+    addScore(2, 6);
+    showFeedback('p7', true, 'All 6 activities correctly assigned to Work [PhD], Health, and Relationships!');
+    checkL2Complete();
+  } else if (!questDone) {
+    const wrong = 6 - correct;
+    showFeedback('p7', false, `${wrong} assignment(s) are incorrect. Think carefully about each category.`);
+    setTimeout(() => ids.forEach(id => { document.getElementById(id).className = 'qa-select'; }), 1500);
+  }
+}
+
+// P8: Quote
+let quoteDone = false;
+function checkQuote() {
+  if (quoteDone) return;
+  const a = document.getElementById('q8a').value;
+  const b = document.getElementById('q8b').value;
+  const c = document.getElementById('q8c').value;
+  const d = document.getElementById('q8d').value;
+  const filled = [a,b,c,d].filter(Boolean).length;
+  if (filled < 4) { showFeedback('p8', false, `${filled}/4 blanks filled — please complete all four before checking.`); return; }
+  if (a==='years' && b==='months' && c==='weeks' && d==='daily') {
+    quoteDone = true;
+    gs.puzzleDone[8] = true;
+    addScore(2, 6);
+    showFeedback('p8', true, 'Perfect! "Dream in years. Plan in months. Evaluate in weeks. Ship daily." — D.J. Patil');
+    document.getElementById('l2-code').classList.add('show');
+    markLevelDone(2);
+  } else {
+    showFeedback('p8', false, 'Some blanks are wrong. Think about the three planning levels in the Trident Calendar System.');
+    setTimeout(() => {
+      ['q8a','q8b','q8c','q8d'].forEach(id => document.getElementById(id).value='');
+    }, 1200);
+  }
+}
+function checkL2Complete() { /* code reveal triggered by final puzzle (P8) */ }
+
+// ════════════════════════════════ LEVEL 3 ═══════════════════════════════════
+
+const bucketCards = [
+  { id: 'bc1', text: 'Meeting with supervisor on Monday at 10am', bkt: 'calendar' },
+  { id: 'bc2', text: 'Read GTD book by David Allen', bkt: 'someday' },
+  { id: 'bc3', text: 'Cake recipe from supervisor', bkt: 'reference' },
+  { id: 'bc4', text: 'Remind supervisor to answer your email', bkt: 'waiting' },
+  { id: 'bc5', text: 'Read paper from supervisor', bkt: 'next' },
+  { id: 'bc6', text: 'Finish PhD', bkt: 'project' },
+  { id: 'bc7', text: 'Wish supervisor a happy birthday', bkt: 'calendar' },
+  { id: 'bc8', text: 'Answer email from student', bkt: 'next' },
+  { id: 'bc9', text: 'Old conference flyer from 2019 (no longer relevant)', bkt: 'trash' },
+  { id: 'bc10', text: 'Random idea: write a blog post about research one day', bkt: 'someday' },
+];
+let bucketCorrectCount = 0;
+function initLevel3() {
+  const src = document.getElementById('p9-source');
+  src.innerHTML = '';
+  const shuffled = [...bucketCards].sort(() => Math.random() - 0.5);
+  shuffled.forEach(c => {
+    const el = document.createElement('div');
+    el.className = 'drag-card'; el.id = c.id;
+    el.draggable = true; el.textContent = c.text;
+    el.dataset.correct = c.bkt;
+    el.addEventListener('dragstart', e => { dragData = c.id; el.classList.add('dragging'); });
+    el.addEventListener('dragend', () => el.classList.remove('dragging'));
+    addTouchDrag(el, e => e.id);
+    src.appendChild(el);
+  });
+  document.querySelectorAll('#p9-buckets .drop-zone').forEach(z => z.addEventListener('dragleave', dragLeave));
+  initP10(); initP11(); initGTDOrder();
+}
+function dropBucket(e) {
+  e.preventDefault(); e.currentTarget.classList.remove('over');
+  if (!dragData) return;
+  const card = document.getElementById(dragData);
+  if (!card || card.classList.contains('placed-correct')) return;
+  const zone = e.currentTarget;
+  const correctBkt = card.dataset.correct;
+  zone.appendChild(card);
+  card.draggable = false;
+  if (zone.dataset.bkt === correctBkt) {
+    card.classList.add('placed-correct');
+    bucketCorrectCount++;
+    if (bucketCorrectCount === bucketCards.length && !gs.puzzleDone[9]) {
+      gs.puzzleDone[9] = true;
+      addScore(3, 7);
+      showFeedback('p9', true, 'All 10 tasks correctly sorted into the GTD buckets!');
+      checkL3Complete();
+    }
+  } else {
+    card.classList.add('placed-wrong');
+    setTimeout(() => {
+      card.classList.remove('placed-wrong');
+      card.draggable = true;
+      document.getElementById('p9-source').appendChild(card);
+    }, 900);
+  }
+  dragData = null;
+}
+
+// P10: 2-Minute Rule
+const p10Data = [
+  { text: 'Reply to an email with a one-line answer', correct: 'now' },
+  { text: 'Revise Chapter 3 of your dissertation', correct: 'plan' },
+  { text: 'Call a colleague to confirm a meeting time', correct: 'now' },
+  { text: 'Prepare the methodology section', correct: 'plan' },
+  { text: 'Forward a relevant paper to your co-author', correct: 'now' },
+];
+let p10done = Array(5).fill(false);
+function initP10() {
+  const container = document.getElementById('p10-items');
+  container.innerHTML = '';
+  p10Data.forEach((item, i) => {
+    const div = document.createElement('div');
+    div.className = 'svk-card'; div.style = 'margin-bottom:8px;';
+    div.innerHTML = `<div class="svk-text">${item.text}</div>
+      <div class="svk-choice-row">
+        <button class="svk-btn" onclick="pickP10(this,${i},'now')">✅ Do it now (&lt;2 min)</button>
+        <button class="svk-btn" onclick="pickP10(this,${i},'plan')">📅 Plan it (&gt;2 min)</button>
+      </div>`;
+    container.appendChild(div);
+  });
+}
+let p10correctCount = 0;
+function pickP10(btn, i, choice) {
+  const card = btn.closest('.svk-card');
+  if (card.dataset.done) return;
+  const correct = p10Data[i].correct;
+  const btns = card.querySelectorAll('.svk-btn');
+  btns.forEach(b => b.classList.add('svk-disabled'));
+  if (choice === correct) {
+    btn.classList.add('svk-correct');
+    card.dataset.done = '1';
+    p10correctCount++;
+    if (p10correctCount === p10Data.length && !gs.puzzleDone[10]) {
+      gs.puzzleDone[10] = true;
+      addScore(3, 6);
+      showFeedback('p10', true, 'All 5 scenarios correctly classified using the 2-Minute Rule!');
+      checkL3Complete();
+    }
+  } else {
+    btn.classList.add('svk-wrong');
+    btns.forEach(b => { if (b !== btn) b.classList.remove('svk-disabled'); });
+  }
+}
+
+// P11: Actionable or Not
+const p11Data = [
+  { text: 'Finish PhD', correct: 'no' },
+  { text: 'Write the next chapter outline (2 pages)', correct: 'yes' },
+  { text: 'Be more productive', correct: 'no' },
+  { text: 'Send email to Prof. Müller asking for feedback on the abstract', correct: 'yes' },
+  { text: 'Do more sport', correct: 'no' },
+  { text: 'Schedule 30-min run in calendar for tomorrow 7am', correct: 'yes' },
+];
+let p11correctCount = 0;
+function initP11() {
+  const container = document.getElementById('p11-items');
+  container.innerHTML = '';
+  p11Data.forEach((item, i) => {
+    const div = document.createElement('div');
+    div.className = 'svk-card'; div.style = 'margin-bottom:8px;';
+    div.innerHTML = `<div class="svk-text">"${item.text}"</div>
+      <div class="svk-choice-row">
+        <button class="svk-btn" onclick="pickP11(this,${i},'yes')">✅ Actionable</button>
+        <button class="svk-btn" onclick="pickP11(this,${i},'no')">✗ Not actionable</button>
+      </div>`;
+    container.appendChild(div);
+  });
+}
+function pickP11(btn, i, choice) {
+  const card = btn.closest('.svk-card');
+  if (card.dataset.done) return;
+  const correct = p11Data[i].correct;
+  const btns = card.querySelectorAll('.svk-btn');
+  btns.forEach(b => b.classList.add('svk-disabled'));
+  if (choice === correct) {
+    btn.classList.add('svk-correct');
+    card.dataset.done = '1';
+    p11correctCount++;
+    if (p11correctCount === p11Data.length && !gs.puzzleDone[11]) {
+      gs.puzzleDone[11] = true;
+      addScore(3, 6);
+      showFeedback('p11', true, 'Correct! You can distinguish actionable tasks from vague intentions.');
+      checkL3Complete();
+    }
+  } else {
+    btn.classList.add('svk-wrong');
+    btns.forEach(b => { if (b !== btn) b.classList.remove('svk-disabled'); });
+  }
+}
+
+// P12: GTD Order
+const gtdSteps = ['Capture', 'Clarify', 'Organize', 'Reflect', 'Engage'];
+let gtdOrderCurrent = [];
+let gtdDragIdx = null;
+function initGTDOrder() {
+  gtdOrderCurrent = [...gtdSteps].sort(() => Math.random() - 0.5);
+  renderGTDOrder();
+}
+function renderGTDOrder() {
+  const list = document.getElementById('p12-order');
+  list.innerHTML = '';
+  gtdOrderCurrent.forEach((step, i) => {
+    const el = document.createElement('div');
+    el.className = 'order-item'; el.draggable = true;
+    el.innerHTML = `<span class="order-handle">⠿</span> ${i+1}. ${step}`;
+    el.dataset.idx = i;
+    el.addEventListener('dragstart', () => gtdDragIdx = i);
+    el.addEventListener('dragover', e => { e.preventDefault(); });
+    el.addEventListener('drop', e => {
+      e.preventDefault();
+      if (gtdDragIdx === null || gtdDragIdx === i) return;
+      const arr = [...gtdOrderCurrent];
+      const [moved] = arr.splice(gtdDragIdx, 1);
+      arr.splice(i, 0, moved);
+      gtdOrderCurrent = arr;
+      gtdDragIdx = null;
+      renderGTDOrder();
+    });
+    list.appendChild(el);
+  });
+}
+function checkGTDOrder() {
+  if (gs.puzzleDone[12]) return;
+  const correct = JSON.stringify(gtdSteps);
+  const current = JSON.stringify(gtdOrderCurrent);
+  if (correct === current) {
+    gs.puzzleDone[12] = true;
+    addScore(3, 6);
+    showFeedback('p12', true, 'Perfect order: Capture → Clarify → Organize → Reflect → Engage!');
+    document.querySelectorAll('#p12-order .order-item').forEach(el => { el.classList.add('order-correct'); el.draggable = false; });
+    document.getElementById('l3-code').classList.add('show');
+    markLevelDone(3);
+  } else {
+    showFeedback('p12', false, 'Not quite right. Remember: first get everything out of your head, then decide what to do with each item.');
+  }
+}
+function checkL3Complete() { /* code reveal triggered by final puzzle (P12) */ }
+
+// ════════════════════════════════ LEVEL 4 ═══════════════════════════════════
+
+// P13: Habit Loop
+const p13Data = [
+  { text: 'Push notification on the smartphone ("New message")', correct: 'cue' },
+  { text: 'Need for distraction, entertainment or social confirmation', correct: 'craving' },
+  { text: 'Immediately opening Instagram, TikTok or WhatsApp', correct: 'response' },
+  { text: 'Short-term feeling of fun, connection or relaxation', correct: 'reward' },
+];
+let p13correctCount = 0;
+function initP13() {
+  const container = document.getElementById('p13-items');
+  container.innerHTML = '';
+  const shuffled = [...p13Data].sort(() => Math.random() - 0.5);
+  shuffled.forEach((item, i) => {
+    const orig = p13Data.findIndex(d => d.text === item.text);
+    const div = document.createElement('div');
+    div.className = 'svk-card'; div.style = 'margin-bottom:8px;';
+    div.innerHTML = `<div class="svk-text">"${item.text}"</div>
+      <div class="svk-choice-row" style="flex-wrap:wrap; gap:4px;">
+        <button class="svk-btn" onclick="pickP13(this,${orig},'cue')">Cue</button>
+        <button class="svk-btn" onclick="pickP13(this,${orig},'craving')">Craving</button>
+        <button class="svk-btn" onclick="pickP13(this,${orig},'response')">Response</button>
+        <button class="svk-btn" onclick="pickP13(this,${orig},'reward')">Reward</button>
+      </div>`;
+    container.appendChild(div);
+  });
+}
+function pickP13(btn, i, choice) {
+  const card = btn.closest('.svk-card');
+  if (card.dataset.done) return;
+  const correct = p13Data[i].correct;
+  const btns = card.querySelectorAll('.svk-btn');
+  btns.forEach(b => b.classList.add('svk-disabled'));
+  if (choice === correct) {
+    btn.classList.add('svk-correct');
+    card.dataset.done = '1';
+    p13correctCount++;
+    if (p13correctCount === 4 && !gs.puzzleDone[13]) {
+      gs.puzzleDone[13] = true;
+      addScore(4, 7);
+      showFeedback('p13', true, 'Correct! You identified all four phases of the Habit Loop.');
+      checkL4Complete();
+    }
+  } else {
+    btn.classList.add('svk-wrong');
+    btns.forEach(b => { if (b !== btn) b.classList.remove('svk-disabled'); });
+  }
+}
+
+// P14
+let p14a = false, p14b = false;
+function pickMC(el, result, fbId) {
+  const parent = el.parentElement;
+  if (parent.dataset.locked) return;
+  parent.dataset.locked = '1';
+  parent.querySelectorAll('.mc-option').forEach(o => o.classList.add('disabled'));
+  el.classList.add(result);
+  if (result === 'correct') {
+    p14a = true;
+    if (fbId) document.getElementById(fbId).className='feedback show correct';
+    if (fbId) document.getElementById(fbId).textContent = '✓ Correct! 1.01¹⁰⁵ ≈ 2.84';
+    if (p14b && !gs.puzzleDone[14]) { gs.puzzleDone[14]=true; addScore(4, 6); showFeedback('p14',true,'Both correct! Consistency compounds dramatically over a semester.'); checkL4Complete(); }
+  } else {
+    el.classList.add('wrong');
+    parent.querySelectorAll('.mc-option').forEach(o => { if(o!==el) o.classList.add('correct'); });
+    if (fbId) { document.getElementById(fbId).className='feedback show wrong'; document.getElementById(fbId).textContent='✗ Not quite. Remember: 1.01¹⁰⁵'; }
+    setTimeout(() => { parent.dataset.locked=''; parent.querySelectorAll('.mc-option').forEach(o=>o.classList.remove('disabled','correct','wrong')); if(fbId){document.getElementById(fbId).className='feedback';} }, 1400);
+  }
+}
+function pickMC14b(el, result) {
+  const parent = el.parentElement;
+  if (parent.dataset.locked) return;
+  parent.dataset.locked = '1';
+  parent.querySelectorAll('.mc-option').forEach(o => o.classList.add('disabled'));
+  el.classList.add(result);
+  if (result === 'correct') {
+    p14b = true;
+    if (p14a && !gs.puzzleDone[14]) { gs.puzzleDone[14]=true; addScore(4, 6); showFeedback('p14',true,'Both correct! 1.01¹⁰⁵ = 2.84 vs 0.99¹⁰⁵ = 0.35 — consistency beats intensity.'); checkL4Complete(); }
+  } else {
+    setTimeout(() => { parent.dataset.locked=''; parent.querySelectorAll('.mc-option').forEach(o=>o.classList.remove('disabled','correct','wrong')); }, 1400);
+  }
+}
+
+// P15: 4 Laws
+const lawCards = [
+  { id:'lc1', text:'Implementation intention: "I will [behavior] at [time] in [this place]"', law:'obvious' },
+  { id:'lc2', text:'Habit stacking: "After [current habit] I will [new habit]"', law:'obvious' },
+  { id:'lc3', text:'Pair a habit you need with something you enjoy (temptation bundling)', law:'attractive' },
+  { id:'lc4', text:'Join a culture where your desired behavior is the norm', law:'attractive' },
+  { id:'lc5', text:'2-minute rule: scale down the new habit to 2 minutes', law:'easy' },
+  { id:'lc6', text:'Reduce friction — set up the environment in advance', law:'easy' },
+  { id:'lc7', text:'Use a habit tracker', law:'satisfying' },
+  { id:'lc8', text:'Create an immediate reward after completing the habit', law:'satisfying' },
+];
+let lawCorrectCount = 0;
+function initLevel4() {
+  const src = document.getElementById('p15-source');
+  src.innerHTML = '';
+  const shuffled = [...lawCards].sort(() => Math.random() - 0.5);
+  shuffled.forEach(c => {
+    const el = document.createElement('div');
+    el.className = 'drag-card'; el.id = c.id;
+    el.draggable = true; el.textContent = c.text;
+    el.dataset.correct = c.law;
+    el.style = 'max-width:280px; font-size:12px;';
+    el.addEventListener('dragstart', e => { dragData = c.id; el.classList.add('dragging'); });
+    el.addEventListener('dragend', () => el.classList.remove('dragging'));
+    addTouchDrag(el, e => e.id);
+    src.appendChild(el);
+  });
+  document.querySelectorAll('#p15-laws .drop-zone').forEach(z => z.addEventListener('dragleave', dragLeave));
+  initP13();
+}
+function dropLaw(e) {
+  e.preventDefault(); e.currentTarget.classList.remove('over');
+  if (!dragData) return;
+  const card = document.getElementById(dragData);
+  if (!card || card.classList.contains('placed-correct')) return;
+  const zone = e.currentTarget;
+  const correct = card.dataset.correct;
+  zone.appendChild(card);
+  card.draggable = false;
+  if (zone.dataset.law === correct) {
+    card.classList.add('placed-correct');
+    lawCorrectCount++;
+    if (lawCorrectCount === lawCards.length && !gs.puzzleDone[15]) {
+      gs.puzzleDone[15] = true;
+      addScore(4, 6);
+      showFeedback('p15', true, 'All 8 strategies correctly sorted into the 4 Laws of Good Habits!');
+      checkL4Complete();
+    }
+  } else {
+    card.classList.add('placed-wrong');
+    setTimeout(() => {
+      card.classList.remove('placed-wrong');
+      card.draggable = true;
+      document.getElementById('p15-source').appendChild(card);
+    }, 900);
+  }
+  dragData = null;
+}
+
+// P16: Habit Stacking MC
+let p16done = false;
+function pickHSMC(el, result) {
+  if (p16done) return;
+  p16done = true;
+  document.querySelectorAll('#p16-mc .mc-option').forEach(o => o.classList.add('disabled'));
+  el.classList.add(result);
+  if (result === 'correct') {
+    gs.puzzleDone[16] = true;
+    addScore(4, 6);
+    showFeedback('p16', true, 'Correct! "After my morning coffee, I will read my textbook for 10 minutes" — clear anchor + specific new behavior.');
+    checkL4Complete();
+  } else {
+    showFeedback('p16', false, 'Not quite. Look for the option with a clear existing habit as the anchor.');
+    setTimeout(() => {
+      p16done = false;
+      document.querySelectorAll('#p16-mc .mc-option').forEach(o => o.classList.remove('disabled','correct','wrong'));
+    }, 1400);
+  }
+}
+
+function checkL4Complete() {
+  if (gs.puzzleDone[13] && gs.puzzleDone[14] && gs.puzzleDone[15] && gs.puzzleDone[16]) {
+    document.getElementById('l4-code').classList.add('show');
+    markLevelDone(4);
+  }
+}
+
+// ════════════════════════════════ FINAL ═════════════════════════════════════
+
+function submitCodes() {
+  const codes = ['SPRINT42','TRIDENT24','CAPTURE5','ATOMIC1'];
+  const inputs = ['ci1','ci2','ci3','ci4'];
+  let allOk = true;
+  inputs.forEach((id, i) => {
+    const val = document.getElementById(id).value.trim().toUpperCase();
+    if (val !== codes[i]) { allOk = false; document.getElementById(id).classList.add('wrong'); }
+    else { document.getElementById(id).classList.add('correct'); }
+  });
+  if (allOk) {
+    document.getElementById('code-feedback').className = 'feedback show correct';
+    document.getElementById('code-feedback').textContent = '✓ All codes verified! Uploading dissertation…';
+    setTimeout(showFinalSuccess, 1200);
+  } else {
+    document.getElementById('code-feedback').className = 'feedback show wrong';
+    document.getElementById('code-feedback').textContent = '✗ One or more codes are incorrect. Check each level\'s code carefully.';
+    setTimeout(() => inputs.forEach(id => document.getElementById(id).classList.remove('wrong','correct')), 1500);
+  }
+}
+
+function showFinalSuccess() {
+  showScreen('screen-intro');
+  document.getElementById('final-success').style.display = 'block';
+  document.getElementById('home-code-area').style.display = 'none';
+  document.getElementById('success-term-body').innerHTML = '';
+  document.getElementById('success-reveal').style.opacity = '0';
+  document.getElementById('success-reveal').style.pointerEvents = 'none';
+
+  // Pre-build score cards (hidden until reveal)
+  const labels = ['The Scrum Lab', 'The Calendar Tower', 'The GTD HQ', 'The Habits Lab'];
+  const accents = ['#238636','#1f6feb','#9e6a03','#8957e5'];
+  const cards = document.getElementById('final-score-cards');
+  cards.innerHTML = '';
+  let total = 0;
+  gs.scores.forEach((s, i) => {
+    total += s;
+    const div = document.createElement('div');
+    div.className = 'final-score-card';
+    div.style = `border-color: ${accents[i]}44;`;
+    const max = 25;
+    const pct = Math.round((s/max)*100);
+    const note = pct >= 90 ? 'Excellent!' : pct >= 70 ? 'Good work!' : pct >= 50 ? 'Keep practising.' : 'Review this chapter.';
+    div.innerHTML = `<div class="fsc-level">Level ${i+1} · ${labels[i]}</div><div class="fsc-pts" style="color:${accents[i]}">${s}/${max}</div><div class="fsc-note">${note}</div>`;
+    cards.appendChild(div);
+  });
+  const pct = Math.round((total/100)*100);
+  document.getElementById('final-total-display').innerHTML =
+    `Total Score: <span style="background:linear-gradient(90deg,#58a6ff,#3fb950);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">${total}/100</span> (${pct}%)`;
+
+  runSuccessAnimation(total);
+}
+
+async function runSuccessAnimation(total) {
+  const body = document.getElementById('success-term-body');
+
+  function addLine() {
+    const line = document.createElement('div');
+    line.className = 'term-line';
+    body.appendChild(line);
+    return line;
+  }
+
+  // Command
+  const cmdLine = addLine();
+  const promptEl = document.createElement('span');
+  promptEl.className = 'prompt';
+  promptEl.textContent = 'goethe-uni@server:~$ ';
+  cmdLine.appendChild(promptEl);
+  const cmdEl = document.createElement('span');
+  cmdEl.className = 'cmd';
+  cmdLine.appendChild(cmdEl);
+  await typeText(cmdEl, 'upload dissertation_final.pdf --security-key ****', 42);
+  await sleep(300);
+
+  // Connecting
+  const connLine = addLine();
+  const connLabel = document.createElement('span');
+  connLabel.className = 'dim';
+  connLabel.textContent = 'Connecting to upload.goethe.de';
+  connLine.appendChild(connLabel);
+  const connDots = document.createElement('span');
+  connDots.className = 'dim';
+  connLine.appendChild(connDots);
+  for (let i = 0; i < 10; i++) { connDots.textContent += '.'; await sleep(110); }
+  const connOk = document.createElement('span');
+  connOk.className = 'ok';
+  connOk.textContent = ' connected';
+  connLine.appendChild(connOk);
+  await sleep(250);
+
+  // 4 security level checks
+  const levels = [
+    ['Level 1', 'Agile Methods     '],
+    ['Level 2', 'Time Management   '],
+    ['Level 3', 'Getting Things Done'],
+    ['Level 4', 'Atomic Habits     '],
+  ];
+  for (const [lvl, name] of levels) {
+    const line = addLine();
+    const label = document.createElement('span');
+    label.className = 'dim';
+    label.textContent = `Verifying security ${lvl} [${name}] `;
+    line.appendChild(label);
+    const dots = document.createElement('span');
+    dots.className = 'dim';
+    line.appendChild(dots);
+    const dotCount = 5 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < dotCount; i++) { dots.textContent += '.'; await sleep(95); }
+    await sleep(120);
+    const okEl = document.createElement('span');
+    okEl.className = 'ok';
+    okEl.textContent = ' ✓ PASSED';
+    line.appendChild(okEl);
+    await sleep(180);
+  }
+
+  await sleep(250);
+
+  // Progress bar
+  const upLine = addLine();
+  const upLabel = document.createElement('span');
+  upLabel.className = 'dim';
+  upLabel.textContent = 'Uploading dissertation_final.pdf  ';
+  upLine.appendChild(upLabel);
+  const barEl = document.createElement('span');
+  barEl.style.color = '#3fb950';
+  barEl.style.fontFamily = 'monospace';
+  upLine.appendChild(barEl);
+  const barLen = 22;
+  for (let i = 0; i <= barLen; i++) {
+    barEl.textContent = '[' + '█'.repeat(i) + '░'.repeat(barLen - i) + '] ' + Math.round((i / barLen) * 100) + '%';
+    await sleep(55);
+  }
+  await sleep(300);
+
+  // Success lines
+  const l1 = addLine();
+  l1.innerHTML = '<span class="ok">✓ File integrity verified. Size: 3.8 MB.</span>';
+  await sleep(200);
+  const l2 = addLine();
+  l2.innerHTML = '<span class="ok">✓ All security checks passed.</span>';
+  await sleep(200);
+  const l3 = addLine();
+  l3.innerHTML = '<span class="ok">✓ Dissertation uploaded successfully.</span>';
+  await sleep(200);
+
+  const now = new Date();
+  const elapsed = gs.timerStarted ? Math.round((Date.now() - gs.timerStarted) / 1000) : 0;
+  const em = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  const es = String(elapsed % 60).padStart(2, '0');
+  const timeStr = now.toLocaleTimeString() + (elapsed > 0 ? ' — completed in ' + em + ':' + es : '');
+  const l4 = addLine();
+  l4.innerHTML = `<span class="ok">✓ Submission confirmed: ${timeStr}</span>`;
+  await sleep(400);
+
+  // Score line in terminal
+  const scoreRating = total >= 90 ? 'OUTSTANDING' : total >= 70 ? 'EXCELLENT' : total >= 50 ? 'GOOD' : 'COMPLETE';
+  const scoreLine = addLine();
+  scoreLine.innerHTML = `<span class="dim">Performance rating: </span><span style="color:#d2a8ff;font-weight:bold;">${total}/100 — ${scoreRating}</span>`;
+  await sleep(600);
+
+  // Blinking cursor line
+  const cursorLine = addLine();
+  cursorLine.innerHTML = '<span class="prompt">goethe-uni@server:~$ </span><span class="cursor" style="display:inline-block;width:9px;height:14px;background:#27c93f;vertical-align:middle;animation:blink 1s step-end infinite;"></span>';
+
+  // Reveal scores and message
+  const reveal = document.getElementById('success-reveal');
+  reveal.style.opacity = '1';
+  reveal.style.pointerEvents = 'auto';
+  spawnConfetti();
+}
+
+function spawnConfetti() {
+  const wrap = document.getElementById('confetti');
+  const colors = ['#58a6ff','#3fb950','#f78166','#d2a8ff','#ffa657','#79c0ff'];
+  for (let i = 0; i < 80; i++) {
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    el.style.left = Math.random() * 100 + 'vw';
+    el.style.animationDelay = Math.random() * 2 + 's';
+    el.style.animationDuration = (2 + Math.random() * 2) + 's';
+    el.style.background = colors[Math.floor(Math.random() * colors.length)];
+    el.style.transform = `rotate(${Math.random()*360}deg)`;
+    wrap.appendChild(el);
+    const dur = parseFloat(el.style.animationDuration) * 1000 + parseFloat(el.style.animationDelay) * 1000 + 200;
+    setTimeout(() => el.remove(), dur);
+  }
+}
+
+// ── Terminal intro animation ──────────────────────────────────────────────────
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function typeText(el, text, speed) {
+  speed = speed || 52;
+  for (let i = 0; i < text.length; i++) { el.textContent += text[i]; await sleep(speed); }
+}
+
+async function animateDots(el) {
+  for (let round = 0; round < 3; round++) {
+    for (let d = 0; d < 3; d++) { el.textContent += '.'; await sleep(260); }
+    await sleep(160);
+    el.textContent = '';
+  }
+  el.textContent = '…';
+}
+
+async function runIntroAnimation() {
+  const cmdText = document.getElementById('tl-cmd-text');
+  const cursor  = document.getElementById('tl-cursor');
+  const tlErr   = document.getElementById('tl-err');
+  const tlDim   = document.getElementById('tl-dim');
+  const tlOk    = document.getElementById('tl-ok');
+  const tlDots  = document.getElementById('tl-dots');
+  const story   = document.getElementById('intro-story');
+
+  await sleep(600);
+  await typeText(cmdText, 'connect dissertation-upload.goethe.de', 48);
+  await sleep(320);
+  cursor.style.display = 'none';
+
+  await sleep(200);
+  tlErr.style.visibility = 'visible';
+  await sleep(450);
+  tlDim.style.visibility = 'visible';
+  await sleep(550);
+  tlOk.style.visibility  = 'visible';
+  await animateDots(tlDots);
+
+  await sleep(400);
+  story.classList.add('visible');
+}
+
+window.addEventListener('DOMContentLoaded', runIntroAnimation);
+
+</script>
+</body>
+</html>
